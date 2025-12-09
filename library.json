@@ -1,0 +1,28 @@
+{
+    "name": "ui-lvgl-components",
+    "version": "0.1.0",
+    "description": "Reusable LVGL UI components for open-control framework",
+    "keywords": ["lvgl", "ui", "widgets", "embedded", "gui"],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/open-control/ui-lvgl-components.git"
+    },
+    "authors": [
+        {
+            "name": "open-control",
+            "url": "https://github.com/open-control"
+        }
+    ],
+    "license": "MIT",
+    "frameworks": ["arduino"],
+    "platforms": ["teensy", "espressif32", "ststm32"],
+    "dependencies": {
+        "open-control/ui-lvgl": ">=0.1.0"
+    },
+    "build": {
+        "srcFilter": ["+<*>", "+<widget/>"],
+        "includeDir": "include",
+        "srcDir": "src",
+        "flags": ["-std=gnu++17"]
+    }
+}
