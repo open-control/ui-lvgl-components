@@ -97,8 +97,10 @@ set(SDL2_DISABLE_SDL2MAIN ON CACHE BOOL "" FORCE)
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 
-# Skip pkg-config (self-contained)
-set(PKG_CONFIG_EXECUTABLE "" CACHE STRING "" FORCE)
+# Skip pkg-config on Windows (self-contained), keep on Linux for Wayland detection
+if(WIN32)
+    set(PKG_CONFIG_EXECUTABLE "" CACHE STRING "" FORCE)
+endif()
 
 FetchContent_MakeAvailable(SDL2)
 FetchContent_GetProperties(SDL2 SOURCE_DIR SDL2_SOURCE_DIR)

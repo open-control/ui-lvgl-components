@@ -1,7 +1,17 @@
 # CMake toolchain for Zig compiler
 # Requires ZIG_DIR environment variable to be set
 
-set(CMAKE_SYSTEM_NAME Windows)
+# Detect host platform and set appropriate system name
+if(CMAKE_HOST_WIN32)
+    set(CMAKE_SYSTEM_NAME Windows)
+elseif(CMAKE_HOST_APPLE)
+    set(CMAKE_SYSTEM_NAME Darwin)
+elseif(CMAKE_HOST_UNIX)
+    set(CMAKE_SYSTEM_NAME Linux)
+else()
+    message(FATAL_ERROR "Unsupported host platform")
+endif()
+
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
 # Find zig executable
@@ -12,7 +22,7 @@ else()
 endif()
 
 # Platform-specific executable extension
-if(WIN32 OR CMAKE_HOST_WIN32)
+if(CMAKE_HOST_WIN32)
     set(ZIG_EXE "${ZIG_DIR}/zig.exe")
 else()
     set(ZIG_EXE "${ZIG_DIR}/zig")
@@ -26,7 +36,7 @@ endif()
 get_filename_component(TOOLCHAIN_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
 
 # Use zig as C and C++ compiler
-if(WIN32 OR CMAKE_HOST_WIN32)
+if(CMAKE_HOST_WIN32)
     set(CMAKE_C_COMPILER "${TOOLCHAIN_DIR}/zig-cc.cmd")
     set(CMAKE_CXX_COMPILER "${TOOLCHAIN_DIR}/zig-c++.cmd")
 else()
@@ -40,12 +50,12 @@ set(CMAKE_CXX_COMPILER_WORKS TRUE)
 set(CMAKE_C_ABI_COMPILED TRUE)
 set(CMAKE_CXX_ABI_COMPILED TRUE)
 
-# Use zig's native target
+# Use native target
 set(CMAKE_C_COMPILER_TARGET "native")
 set(CMAKE_CXX_COMPILER_TARGET "native")
 
 # AR and RANLIB using zig wrappers
-if(WIN32 OR CMAKE_HOST_WIN32)
+if(CMAKE_HOST_WIN32)
     set(CMAKE_AR "${TOOLCHAIN_DIR}/zig-ar.cmd" CACHE FILEPATH "")
     set(CMAKE_C_COMPILER_AR "${TOOLCHAIN_DIR}/zig-ar.cmd" CACHE FILEPATH "")
     set(CMAKE_CXX_COMPILER_AR "${TOOLCHAIN_DIR}/zig-ar.cmd" CACHE FILEPATH "")

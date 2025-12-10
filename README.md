@@ -35,7 +35,37 @@ The SDL demo provides a desktop environment to develop and test UI components wi
 - **Git** (with Git Bash on Windows)
 - **VSCode** + **PlatformIO extension**
 
-That's it! The build system is 100% self-contained - it downloads Zig, CMake, and Ninja automatically.
+#### Linux only: Graphics headers
+
+On Linux, SDL2 needs graphics development headers to enable display support. The build tools (Zig, CMake, Ninja) are downloaded automatically, but the graphics headers must be installed from your system package manager.
+
+**Fedora/RHEL:**
+```bash
+# Wayland (recommended)
+sudo dnf install wayland-devel libxkbcommon-devel mesa-libEGL-devel
+
+# Or X11
+sudo dnf install libX11-devel libXext-devel libXrandr-devel libXcursor-devel libXi-devel
+```
+
+**Ubuntu/Debian:**
+```bash
+# Wayland (recommended)
+sudo apt install libwayland-dev libxkbcommon-dev libegl1-mesa-dev
+
+# Or X11
+sudo apt install libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev
+```
+
+**Why is this needed?**
+
+| Platform | Compile-time headers | Runtime libraries |
+|----------|---------------------|-------------------|
+| **Windows** | Bundled in Zig (MinGW) | Always present (user32.dll, gdi32.dll) |
+| **Linux** | System packages (`*-devel`) | Always present on desktop distros |
+| **macOS** | Xcode frameworks | Always present |
+
+Windows appears "self-contained" because Zig bundles MinGW headers and Windows always has the Win32 graphics DLLs. On Linux, the runtime libraries (libwayland, libEGL) are present on any desktop system, but the development headers are not installed by default.
 
 ### Setup
 
@@ -75,9 +105,9 @@ cd ui-lvgl-components
 | `./clean_env.sh --build-only` | Clean build artifacts only |
 | `./init_env.sh` | Initialize environment manually |
 
-## Self-Contained Build System
+## Build System
 
-The build system requires **no system compiler** - it downloads everything automatically:
+The build system downloads its toolchain automatically:
 
 | Tool | Version | Purpose |
 |------|---------|---------|
@@ -86,11 +116,31 @@ The build system requires **no system compiler** - it downloads everything autom
 | **Ninja** | 1.13.2 | Fast build system |
 | **SDL2** | 2.30.10 | Fetched by CMake (FetchContent) |
 
-All tools are downloaded to `tools/` and cached between builds. The total download is ~200MB on first run, subsequent builds are instant.
+All tools are downloaded to `tools/` and cached between builds (~200MB on first run).
 
 ### Why Zig?
 
-Zig provides a hermetic C/C++ toolchain that works identically across Windows, Linux, and macOS - no Visual Studio, no MinGW, no Xcode required. Just Git Bash.
+Zig provides a hermetic C/C++ toolchain that works identically across Windows, Linux, and macOS - no Visual Studio, no MinGW, no Xcode required.
+
+### Platform differences
+
+> **Note:** macOS support is implemented but remains untested.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        SDL Demo Binary                          │
+├─────────────────────────────────────────────────────────────────┤
+│  Compile time                │  Runtime                         │
+├──────────────────────────────┼──────────────────────────────────┤
+│  Zig (bundled)               │  System graphics libs            │
+│  CMake (bundled)             │  - Windows: user32.dll, gdi32.dll│
+│  Ninja (bundled)             │  - Linux: libwayland, libEGL     │
+│  SDL2 (fetched)              │  - macOS: Cocoa frameworks       │
+│  + Linux: *-devel headers    │                                  │
+└──────────────────────────────┴──────────────────────────────────┘
+```
+
+The binary always dynamically links to system graphics libraries (required to communicate with the display server). On Windows, headers are bundled in Zig. On Linux, you need to install development headers (see Prerequisites).
 
 ## Installation (PlatformIO)
 
