@@ -46,21 +46,10 @@ public:
     lv_obj_t* inner() const { return button_box_; }
 
     // Fluent Configuration
-    /** @brief Background color when OFF */
-    ButtonWidget& offColor(uint32_t color) &;
-    ButtonWidget offColor(uint32_t color) &&;
-
-    /** @brief Background color when ON */
-    ButtonWidget& onColor(uint32_t color) &;
-    ButtonWidget onColor(uint32_t color) &&;
-
-    /** @brief Text color when OFF */
-    ButtonWidget& textOffColor(uint32_t color) &;
-    ButtonWidget textOffColor(uint32_t color) &&;
-
-    /** @brief Text color when ON */
-    ButtonWidget& textOnColor(uint32_t color) &;
-    ButtonWidget textOnColor(uint32_t color) &&;
+    ButtonWidget& offColor(uint32_t color);      ///< Background when OFF
+    ButtonWidget& onColor(uint32_t color);       ///< Background when ON
+    ButtonWidget& textOffColor(uint32_t color);  ///< Text color when OFF
+    ButtonWidget& textOnColor(uint32_t color);   ///< Text color when ON
 
     // State
     void setState(bool on);
@@ -70,18 +59,24 @@ public:
     void setText(const char* text);
 
 private:
-    static constexpr uint16_t DEFAULT_SIZE = 62;
-    static constexpr uint16_t BUTTON_SIZE = 40;
-    static constexpr uint8_t BUTTON_RADIUS = 8;
+    // Sizing ratios (relative to min(parent_w, parent_h))
+    static constexpr float BUTTON_SIZE_RATIO = 0.6f;  // 60% of min parent dimension
+    static constexpr float RADIUS_RATIO = 0.15f;      // Corner radius relative to button size
+    static constexpr lv_coord_t MIN_SIZE = 20;        // Minimum button size
 
     void createUI();
     void cleanup();
     void applyState();
+    void updateGeometry();
+    static void sizeChangedCallback(lv_event_t* e);
 
     // LVGL objects
     lv_obj_t* container_ = nullptr;
     lv_obj_t* button_box_ = nullptr;
     lv_obj_t* state_label_ = nullptr;  // Created by setText(), nullptr otherwise
+
+    // Cached size
+    lv_coord_t button_size_ = 0;
 
     // State
     bool is_on_ = false;

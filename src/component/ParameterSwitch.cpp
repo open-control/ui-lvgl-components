@@ -43,27 +43,33 @@ bool ParameterSwitch::isVisible() const {
 }
 
 void ParameterSwitch::createUI(lv_obj_t* parent) {
-    // Container fills parent, uses flex column layout
+    // Container - 100% of parent, grid layout (same pattern as ParameterKnob)
     container_ = lv_obj_create(parent);
-    lv_obj_set_size(container_, lv_pct(100), lv_pct(100));
+    lv_obj_set_size(container_, LV_PCT(100), LV_PCT(100));
     lv_obj_set_style_bg_opa(container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
+    lv_obj_set_style_pad_row(container_, 0, 0);
+    lv_obj_set_style_pad_column(container_, 0, 0);
     lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
-    // Flex column: widget takes remaining space (centered), label has fixed height
-    lv_obj_set_layout(container_, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Grid: 1 column (100%), 2 rows (FR(1) for button, CONTENT for label)
+    static int32_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static int32_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_CONTENT, LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(container_, col_dsc, row_dsc);
+    lv_obj_set_layout(container_, LV_LAYOUT_GRID);
 
-    // Button - centered, takes remaining space (flex_grow)
+    // Row 0: ButtonWidget - centered in remaining space
     button_ = std::make_unique<ButtonWidget>(container_);
-    lv_obj_set_flex_grow(button_->getElement(), 1);
+    lv_obj_set_grid_cell(button_->getElement(),
+        LV_GRID_ALIGN_CENTER, 0, 1,   // col: center
+        LV_GRID_ALIGN_CENTER, 0, 1);  // row: center in row 0
 
-    // Label - fixed height, full width
-    static constexpr int32_t LABEL_HEIGHT = 18;
+    // Row 1: Label - stretch width, content height
     label_ = std::make_unique<Label>(container_);
-    lv_obj_set_size(label_->getElement(), lv_pct(100), LABEL_HEIGHT);
+    lv_obj_set_grid_cell(label_->getElement(),
+        LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch full width
+        LV_GRID_ALIGN_CENTER, 1, 1);  // row: center in row 1
     label_->alignment(LV_TEXT_ALIGN_CENTER)
            .color(BaseTheme::Color::TEXT_PRIMARY)
            .autoScroll(true);

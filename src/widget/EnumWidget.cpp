@@ -70,6 +70,7 @@ void EnumWidget::createUI() {
     lv_obj_set_layout(container_, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_add_flag(container_, LV_OBJ_FLAG_EVENT_BUBBLE);
 
     // Indicator line (at top)
     top_line_ = lv_obj_create(container_);
@@ -81,7 +82,7 @@ void EnumWidget::createUI() {
     lv_obj_set_style_margin_right(top_line_, LINE_MARGIN, 0);
     lv_obj_set_style_margin_top(top_line_, LINE_TOP_MARGIN, 0);
     lv_obj_set_style_margin_bottom(top_line_, LINE_BOTTOM_MARGIN, 0);
-    lv_obj_clear_flag(top_line_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(top_line_, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_set_scrollbar_mode(top_line_, LV_SCROLLBAR_MODE_OFF);
 
     // Inner content area
@@ -94,7 +95,7 @@ void EnumWidget::createUI() {
     lv_obj_set_style_margin_left(inner_, LINE_MARGIN, 0);
     lv_obj_set_style_margin_right(inner_, LINE_MARGIN, 0);
     lv_obj_set_scrollbar_mode(inner_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(inner_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(inner_, LV_OBJ_FLAG_EVENT_BUBBLE);
 
     applyColors();
 }

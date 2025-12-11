@@ -61,6 +61,10 @@ void Label::createWidgets(lv_obj_t* parent) {
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_SCROLLABLE);
     // Clip overflow for scroll animation
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    // Bubble events to parent for click handling
+    lv_obj_add_flag(container_, LV_OBJ_FLAG_EVENT_BUBBLE);
+    // Recalculate alignment on resize
+    lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
 
     // The actual label - full width, content height
     label_ = lv_label_create(container_);
@@ -68,6 +72,7 @@ void Label::createWidgets(lv_obj_t* parent) {
     lv_obj_set_width(label_, LV_SIZE_CONTENT);
     lv_obj_set_style_pad_all(label_, 0, 0);
     lv_label_set_long_mode(label_, LV_LABEL_LONG_CLIP);
+    lv_obj_add_flag(label_, LV_OBJ_FLAG_EVENT_BUBBLE);
 }
 
 void Label::cleanup() {
@@ -82,25 +87,17 @@ void Label::cleanup() {
 // Fluent Configuration
 // =============================================================================
 
-Label& Label::autoScroll(bool enabled) & {
+Label& Label::autoScroll(bool enabled) {
     auto_scroll_enabled_ = enabled;
     return *this;
 }
 
-Label Label::autoScroll(bool enabled) && {
-    return std::move(autoScroll(enabled));
-}
-
-Label& Label::alignment(lv_text_align_t align) & {
+Label& Label::alignment(lv_text_align_t align) {
     alignment_ = align;
     return *this;
 }
 
-Label Label::alignment(lv_text_align_t align) && {
-    return std::move(alignment(align));
-}
-
-Label& Label::flexGrow(bool enabled) & {
+Label& Label::flexGrow(bool enabled) {
     if (container_) {
         if (enabled) {
             lv_obj_set_width(container_, 0);
@@ -113,42 +110,26 @@ Label& Label::flexGrow(bool enabled) & {
     return *this;
 }
 
-Label Label::flexGrow(bool enabled) && {
-    return std::move(flexGrow(enabled));
-}
-
-Label& Label::color(uint32_t c) & {
+Label& Label::color(uint32_t c) {
     if (label_) {
         lv_obj_set_style_text_color(label_, lv_color_hex(c), 0);
     }
     return *this;
 }
 
-Label Label::color(uint32_t c) && {
-    return std::move(color(c));
-}
-
-Label& Label::font(const lv_font_t* f) & {
+Label& Label::font(const lv_font_t* f) {
     if (label_ && f) {
         lv_obj_set_style_text_font(label_, f, 0);
     }
     return *this;
 }
 
-Label Label::font(const lv_font_t* f) && {
-    return std::move(font(f));
-}
-
-Label& Label::width(lv_coord_t w) & {
+Label& Label::width(lv_coord_t w) {
     if (container_) {
         lv_obj_set_flex_grow(container_, 0);
         lv_obj_set_width(container_, w);
     }
     return *this;
-}
-
-Label Label::width(lv_coord_t w) && {
-    return std::move(width(w));
 }
 
 // =============================================================================
@@ -267,6 +248,13 @@ void Label::pauseTimerCallback(lv_timer_t* timer) {
     });
 
     lv_anim_start(&anim);
+}
+
+void Label::sizeChangedCallback(lv_event_t* e) {
+    auto* self = static_cast<Label*>(lv_event_get_user_data(e));
+    if (self) {
+        self->checkOverflowAndScroll();
+    }
 }
 
 }  // namespace oc::ui::lvgl

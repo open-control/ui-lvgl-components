@@ -47,32 +47,14 @@ public:
     // LVGL Access
     lv_obj_t* getElement() const override { return container_; }
     operator lv_obj_t*() const { return container_; }
-    lv_obj_t* getArc() const { return arc_; }
-    lv_obj_t* getIndicator() const { return indicator_; }
-    lv_obj_t* getCenterCircle() const { return center_circle_; }
 
     // Fluent Configuration
-    KnobWidget& centered(bool c) &;
-    KnobWidget centered(bool c) &&;
-
-    KnobWidget& origin(float o) &;
-    KnobWidget origin(float o) &&;
-
-    /** @brief Background color of arc (unfilled portion) */
-    KnobWidget& bgColor(uint32_t color) &;
-    KnobWidget bgColor(uint32_t color) &&;
-
-    /** @brief Track color (filled arc portion showing value) */
-    KnobWidget& trackColor(uint32_t color) &;
-    KnobWidget trackColor(uint32_t color) &&;
-
-    /** @brief Value indicator color (line + center circle) */
-    KnobWidget& valueColor(uint32_t color) &;
-    KnobWidget valueColor(uint32_t color) &&;
-
-    /** @brief Flash color for inner circle on value change */
-    KnobWidget& flashColor(uint32_t color) &;
-    KnobWidget flashColor(uint32_t color) &&;
+    KnobWidget& centered(bool c);
+    KnobWidget& origin(float o);
+    KnobWidget& bgColor(uint32_t color);     ///< Arc background (unfilled)
+    KnobWidget& trackColor(uint32_t color);  ///< Arc filled portion
+    KnobWidget& valueColor(uint32_t color);  ///< Indicator line + center
+    KnobWidget& flashColor(uint32_t color);  ///< Flash on value change
 
     // Data
     void setValue(float value);
@@ -128,8 +110,6 @@ private:
 
     // Cached geometry (computed from actual size)
     lv_coord_t knob_size_ = 0;
-    lv_coord_t arc_center_x_ = 0;
-    lv_coord_t arc_center_y_ = 0;
     lv_coord_t arc_radius_ = 0;
 };
 

@@ -29,12 +29,9 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
       origin_(other.origin_),
       centered_(other.centered_),
       knob_size_(other.knob_size_),
-      arc_center_x_(other.arc_center_x_),
-      arc_center_y_(other.arc_center_y_),
       arc_radius_(other.arc_radius_) {
     line_points_[0] = other.line_points_[0];
     line_points_[1] = other.line_points_[1];
-
     other.container_ = nullptr;
     other.arc_ = nullptr;
     other.indicator_ = nullptr;
@@ -46,7 +43,6 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
 KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
     if (this != &other) {
         cleanup();
-
         container_ = other.container_;
         arc_ = other.arc_;
         indicator_ = other.indicator_;
@@ -63,10 +59,7 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         origin_ = other.origin_;
         centered_ = other.centered_;
         knob_size_ = other.knob_size_;
-        arc_center_x_ = other.arc_center_x_;
-        arc_center_y_ = other.arc_center_y_;
         arc_radius_ = other.arc_radius_;
-
         other.container_ = nullptr;
         other.arc_ = nullptr;
         other.indicator_ = nullptr;
@@ -97,6 +90,8 @@ void KnobWidget::createUI() {
     lv_obj_set_style_bg_opa(container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
+    lv_obj_set_style_pad_row(container_, 0, 0);
+    lv_obj_set_style_pad_column(container_, 0, 0);
     lv_obj_add_flag(container_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
     lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
@@ -105,8 +100,11 @@ void KnobWidget::createUI() {
     createCenterCircles();
     applyColors();
 
-    // Listen for size changes to recalculate geometry
-    lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
+    // Listen for parent size changes to recalculate geometry
+    lv_obj_t* parent = lv_obj_get_parent(container_);
+    if (parent) {
+        lv_obj_add_event_cb(parent, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
+    }
 
     // Defer initial geometry calculation to next frame when layout is ready
     lv_timer_t* init_timer = lv_timer_create([](lv_timer_t* t) {
@@ -143,6 +141,7 @@ void KnobWidget::createCenterCircles() {
     lv_obj_set_style_radius(center_circle_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(center_circle_, 0, 0);
     lv_obj_set_style_bg_opa(center_circle_, LV_OPA_COVER, 0);
+    lv_obj_set_scrollbar_mode(center_circle_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(center_circle_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(center_circle_, LV_OBJ_FLAG_EVENT_BUBBLE);
 
@@ -153,6 +152,7 @@ void KnobWidget::createCenterCircles() {
     lv_obj_set_style_border_width(inner_circle_, 0, 0);
     lv_obj_set_style_bg_color(inner_circle_, lv_color_hex(BaseTheme::Color::INACTIVE), 0);
     lv_obj_set_style_bg_opa(inner_circle_, LV_OPA_COVER, 0);
+    lv_obj_set_scrollbar_mode(inner_circle_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(inner_circle_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(inner_circle_, LV_OBJ_FLAG_EVENT_BUBBLE);
 }
@@ -167,29 +167,53 @@ void KnobWidget::sizeChangedCallback(lv_event_t* e) {
 void KnobWidget::updateGeometry() {
     if (!container_) return;
 
-    lv_obj_update_layout(container_);
-    lv_coord_t w = lv_obj_get_width(container_);
-    lv_coord_t h = lv_obj_get_height(container_);
+    lv_obj_t* parent = lv_obj_get_parent(container_);
+    if (!parent) return;
+
+    // Force layout calculation on parent
+    lv_obj_update_layout(parent);
+
+    // Get parent content size (the ParameterKnob container)
+    lv_coord_t parent_w = lv_obj_get_content_width(parent);
+    lv_coord_t parent_h = lv_obj_get_content_height(parent);
 
     // Skip if size not yet determined
-    if (w <= 0 || h <= 0) return;
+    if (parent_w <= 0 || parent_h <= 0) return;
+
+    // Find sibling label to get its height (row 1 uses CONTENT height)
+    lv_coord_t label_h = 0;
+    uint32_t child_count = lv_obj_get_child_count(parent);
+    for (uint32_t i = 0; i < child_count; i++) {
+        lv_obj_t* child = lv_obj_get_child(parent, i);
+        if (child != container_) {
+            // This is the label - get its height
+            label_h = lv_obj_get_height(child);
+            break;
+        }
+    }
+
+    // Available space for knob = parent height - label height
+    lv_coord_t available_w = parent_w;
+    lv_coord_t available_h = parent_h - label_h;
 
     // Use min(width, height) for square knob, enforce minimum
-    knob_size_ = std::max(static_cast<lv_coord_t>(MIN_SIZE), std::min(w, h));
+    knob_size_ = std::max(static_cast<lv_coord_t>(MIN_SIZE), std::min(available_w, available_h));
 
-    // Center point of container
-    arc_center_x_ = w / 2;
-    arc_center_y_ = h / 2;
+    // Set container to square size (grid CENTER will position it)
+    lv_obj_set_size(container_, knob_size_, knob_size_);
 
-    // Compute sizes based on knob_size_
+    // All sizes proportional to knob_size_
+    // Indicator extent from center = arc_radius_ + indicator_thickness/2 must fit in knob_size_/2
+    // So: arc_radius_ = knob_size_ * (1 - INDICATOR_RATIO) / 2 = knob_size_ * ARC_RADIUS_RATIO
+    static constexpr float ARC_RADIUS_RATIO = (1.0f - INDICATOR_RATIO) / 2.0f;
+
     lv_coord_t arc_width = static_cast<lv_coord_t>(knob_size_ * ARC_WIDTH_RATIO);
     lv_coord_t indicator_thickness = static_cast<lv_coord_t>(knob_size_ * INDICATOR_RATIO);
     lv_coord_t center_circle_size = static_cast<lv_coord_t>(knob_size_ * CENTER_CIRCLE_RATIO);
     lv_coord_t inner_circle_size = static_cast<lv_coord_t>(knob_size_ * INNER_CIRCLE_RATIO);
+    arc_radius_ = static_cast<lv_coord_t>(knob_size_ * ARC_RADIUS_RATIO);
 
-    // Arc size and radius (subtract indicator thickness for clean edges)
-    lv_coord_t arc_size = knob_size_ - indicator_thickness;
-    arc_radius_ = arc_size / 2;
+    lv_coord_t arc_size = arc_radius_ * 2;
 
     // Update arc
     if (arc_) {
@@ -203,8 +227,9 @@ void KnobWidget::updateGeometry() {
     // Update indicator line
     if (indicator_) {
         lv_obj_set_style_line_width(indicator_, indicator_thickness, 0);
-        line_points_[0].x = arc_center_x_;
-        line_points_[0].y = arc_center_y_;
+        lv_coord_t center = knob_size_ / 2;
+        line_points_[0].x = center;
+        line_points_[0].y = center;
     }
 
     // Update center circles
@@ -239,7 +264,7 @@ void KnobWidget::applyColors() {
 }
 
 // Fluent setters
-KnobWidget& KnobWidget::centered(bool c) & {
+KnobWidget& KnobWidget::centered(bool c) {
     centered_ = c;
     if (c && origin_ == 0.0f) {
         origin_ = 0.5f;
@@ -249,57 +274,33 @@ KnobWidget& KnobWidget::centered(bool c) & {
     return *this;
 }
 
-KnobWidget KnobWidget::centered(bool c) && {
-    return std::move(centered(c));
-}
-
-KnobWidget& KnobWidget::origin(float o) & {
+KnobWidget& KnobWidget::origin(float o) {
     origin_ = std::clamp(o, 0.0f, 1.0f);
     updateArc();
     return *this;
 }
 
-KnobWidget KnobWidget::origin(float o) && {
-    return std::move(origin(o));
-}
-
-KnobWidget& KnobWidget::bgColor(uint32_t color) & {
+KnobWidget& KnobWidget::bgColor(uint32_t color) {
     bg_color_ = color;
     applyColors();
     return *this;
 }
 
-KnobWidget KnobWidget::bgColor(uint32_t color) && {
-    return std::move(bgColor(color));
-}
-
-KnobWidget& KnobWidget::trackColor(uint32_t color) & {
+KnobWidget& KnobWidget::trackColor(uint32_t color) {
     track_color_ = color;
     applyColors();
     return *this;
 }
 
-KnobWidget KnobWidget::trackColor(uint32_t color) && {
-    return std::move(trackColor(color));
-}
-
-KnobWidget& KnobWidget::valueColor(uint32_t color) & {
+KnobWidget& KnobWidget::valueColor(uint32_t color) {
     value_color_ = color;
     applyColors();
     return *this;
 }
 
-KnobWidget KnobWidget::valueColor(uint32_t color) && {
-    return std::move(valueColor(color));
-}
-
-KnobWidget& KnobWidget::flashColor(uint32_t color) & {
+KnobWidget& KnobWidget::flashColor(uint32_t color) {
     flash_color_ = color;
     return *this;
-}
-
-KnobWidget KnobWidget::flashColor(uint32_t color) && {
-    return std::move(flashColor(color));
 }
 
 void KnobWidget::setValue(float value) {
@@ -339,12 +340,9 @@ void KnobWidget::updateArc() {
 }
 
 void KnobWidget::updateIndicatorLine(float angleRad) {
-    float sin_val = std::sin(angleRad);
-    float cos_val = std::cos(angleRad);
-
-    line_points_[1].x = arc_center_x_ + static_cast<lv_coord_t>(arc_radius_ * cos_val);
-    line_points_[1].y = arc_center_y_ + static_cast<lv_coord_t>(arc_radius_ * sin_val);
-
+    lv_coord_t center = knob_size_ / 2;
+    line_points_[1].x = center + static_cast<lv_coord_t>(arc_radius_ * std::cos(angleRad));
+    line_points_[1].y = center + static_cast<lv_coord_t>(arc_radius_ * std::sin(angleRad));
     lv_obj_refresh_self_size(indicator_);
     lv_obj_invalidate(indicator_);
 }

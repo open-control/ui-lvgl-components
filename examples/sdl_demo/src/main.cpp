@@ -36,8 +36,6 @@ static void enable_dark_title_bar(SDL_Window* window) {
 
 static constexpr int WINDOW_W = 600;
 static constexpr int WINDOW_H = 160;
-static constexpr int CELL_W = 80;
-static constexpr int CELL_H = 100;
 
 // ============================================================================
 // Component storage
@@ -137,11 +135,21 @@ static void create_demo_ui(void);
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
 
+    // Platform-specific SDL hints (must be set before SDL_Init)
+#ifdef _WIN32
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+#elif defined(__linux__)
+    // Linux/Wayland: request window decorations
+    // Option 1: Use libdecor for client-side decorations (requires libdecor at runtime)
+    SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_PREFER_LIBDECOR, "1");
+    // Option 2: Allow compositor to handle decorations (server-side)
+    SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_ALLOW_LIBDECOR, "1");
+#endif
 
     lv_init();
     lv_display_t* disp = sdl_hal_init(WINDOW_W, WINDOW_H);
     lv_sdl_window_set_resizeable(disp, true);
+    lv_sdl_window_set_title(disp, "UI Components Demo");
 
 #ifdef _WIN32
     enable_dark_title_bar(lv_sdl_window_get_window(disp));
@@ -161,12 +169,13 @@ static void create_demo_ui(void) {
     lv_obj_t* scr = lv_screen_active();
     lv_obj_set_style_bg_color(scr, lv_color_hex(BaseTheme::Color::BACKGROUND), 0);
 
-    // Grid: 7 columns fixed width, 1 row fixed height
+    // Grid: 7 flexible columns, 1 flexible row (adapts to window size)
     static int32_t col_dsc[] = {
-        CELL_W, CELL_W, CELL_W, CELL_W, CELL_W, CELL_W, CELL_W,
+        LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
+        LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
         LV_GRID_TEMPLATE_LAST
     };
-    static int32_t row_dsc[] = {CELL_H, LV_GRID_TEMPLATE_LAST};
+    static int32_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
 
     lv_obj_set_grid_dsc_array(scr, col_dsc, row_dsc);
     lv_obj_set_layout(scr, LV_LAYOUT_GRID);

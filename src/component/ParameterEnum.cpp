@@ -45,35 +45,40 @@ bool ParameterEnum::isVisible() const {
 }
 
 void ParameterEnum::createUI(lv_obj_t* parent) {
-    // Container fills parent, uses flex column layout
+    // Container - 100% of parent, grid layout (same pattern as other Parameter* components)
     container_ = lv_obj_create(parent);
-    lv_obj_set_size(container_, lv_pct(100), lv_pct(100));
+    lv_obj_set_size(container_, LV_PCT(100), LV_PCT(100));
     lv_obj_set_style_bg_opa(container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
+    lv_obj_set_style_pad_row(container_, 0, 0);
+    lv_obj_set_style_pad_column(container_, 0, 0);
     lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
-    // Flex column: widget takes remaining space, label has fixed height
-    lv_obj_set_layout(container_, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Grid: 1 column (100%), 2 rows (FR(1) for enum widget, CONTENT for label)
+    static int32_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static int32_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_CONTENT, LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(container_, col_dsc, row_dsc);
+    lv_obj_set_layout(container_, LV_LAYOUT_GRID);
 
-    // Enum widget - takes all available space (flex_grow)
+    // Row 0: EnumWidget - stretch to fill remaining space
     enum_widget_ = std::make_unique<EnumWidget>(container_);
-    lv_obj_set_width(enum_widget_->getElement(), lv_pct(100));
-    lv_obj_set_flex_grow(enum_widget_->getElement(), 1);
+    lv_obj_set_grid_cell(enum_widget_->getElement(),
+        LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch full width
+        LV_GRID_ALIGN_STRETCH, 0, 1); // row: stretch in row 0
 
-    // Value label (inside enum widget inner area - which is flex)
+    // Value label (inside enum widget inner area)
     value_label_ = std::make_unique<Label>(enum_widget_->inner());
-    lv_obj_set_size(value_label_->getElement(), lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_size(value_label_->getElement(), LV_PCT(100), LV_SIZE_CONTENT);
     value_label_->alignment(LV_TEXT_ALIGN_CENTER)
                  .color(BaseTheme::Color::TEXT_PRIMARY)
                  .autoScroll(true);
 
-    // Name label - fixed height, full width
-    static constexpr int32_t LABEL_HEIGHT = 18;
+    // Row 1: Name label - stretch width, content height
     name_label_ = std::make_unique<Label>(container_);
-    lv_obj_set_size(name_label_->getElement(), lv_pct(100), LABEL_HEIGHT);
+    lv_obj_set_grid_cell(name_label_->getElement(),
+        LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch full width
+        LV_GRID_ALIGN_CENTER, 1, 1);  // row: center in row 1
     name_label_->alignment(LV_TEXT_ALIGN_CENTER)
                .color(BaseTheme::Color::TEXT_PRIMARY)
                .autoScroll(true);

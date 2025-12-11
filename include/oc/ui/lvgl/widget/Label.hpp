@@ -66,28 +66,22 @@ public:
     // =========================================================================
 
     /** @brief Enable/disable auto-scroll */
-    Label& autoScroll(bool enabled) &;
-    Label autoScroll(bool enabled) &&;
+    Label& autoScroll(bool enabled);
 
-    /** @brief Set text alignment (when not scrolling) */
-    Label& alignment(lv_text_align_t align) &;
-    Label alignment(lv_text_align_t align) &&;
+    /** @brief Set text alignment (when text fits; overflow always aligns left for scroll) */
+    Label& alignment(lv_text_align_t align);
 
     /** @brief Enable flex-grow for layout */
-    Label& flexGrow(bool enabled) &;
-    Label flexGrow(bool enabled) &&;
+    Label& flexGrow(bool enabled);
 
     /** @brief Set text color */
-    Label& color(uint32_t c) &;
-    Label color(uint32_t c) &&;
+    Label& color(uint32_t c);
 
     /** @brief Set font */
-    Label& font(const lv_font_t* f) &;
-    Label font(const lv_font_t* f) &&;
+    Label& font(const lv_font_t* f);
 
-    /** @brief Set fixed width (disables flex-grow, enables auto-scroll) */
-    Label& width(lv_coord_t w) &;
-    Label width(lv_coord_t w) &&;
+    /** @brief Set fixed width (disables flex-grow) */
+    Label& width(lv_coord_t w);
 
     // =========================================================================
     // Data Setters
@@ -107,6 +101,7 @@ private:
 
     static void scrollAnimCallback(void* var, int32_t value);
     static void pauseTimerCallback(lv_timer_t* timer);
+    static void sizeChangedCallback(lv_event_t* e);
 
     lv_obj_t* container_ = nullptr;
     lv_obj_t* label_ = nullptr;
@@ -115,7 +110,7 @@ private:
     bool auto_scroll_enabled_ = true;
     bool anim_running_ = false;
     lv_coord_t overflow_amount_ = 0;
-    lv_text_align_t alignment_ = LV_TEXT_ALIGN_LEFT;
+    lv_text_align_t alignment_ = LV_TEXT_ALIGN_CENTER;
 
     uint32_t scroll_duration_ms_ = 2000;
     uint32_t pause_duration_ms_ = 1000;
