@@ -15,12 +15,21 @@ namespace oc::ui::lvgl {
  *
  * Displays a parameter value as a circular arc with indicator line.
  * Supports normal and centered (bipolar) modes.
- * Built-in drag interaction for value control.
+ * Pure visual widget - input handling is external.
+ * Flashes inner circle on value change.
+ *
+ * The widget adapts to its parent size:
+ * - Takes 100% of parent width/height
+ * - Uses min(width, height) for knob size (always square)
+ * - Minimum size: 30px
+ * - Centers the knob within the container
  *
  * Usage:
  * @code
  * KnobWidget knob(parent);
- * knob.colorIndex(2);  // Yellow macro color
+ * knob.trackColor(0xFCEB23)
+ *     .valueColor(0x909090)
+ *     .flashColor(0xECA747);
  * knob.setValue(0.5f);
  * @endcode
  */
@@ -43,24 +52,27 @@ public:
     lv_obj_t* getCenterCircle() const { return center_circle_; }
 
     // Fluent Configuration
-    KnobWidget& size(uint16_t w, uint16_t h) &;
-    KnobWidget size(uint16_t w, uint16_t h) &&;
-
-    /** @brief Set color index (0-7 for macro colors), applies to track */
-    KnobWidget& colorIndex(uint8_t index) &;
-    KnobWidget colorIndex(uint8_t index) &&;
-
     KnobWidget& centered(bool c) &;
     KnobWidget centered(bool c) &&;
 
     KnobWidget& origin(float o) &;
     KnobWidget origin(float o) &&;
 
+    /** @brief Background color of arc (unfilled portion) */
+    KnobWidget& bgColor(uint32_t color) &;
+    KnobWidget bgColor(uint32_t color) &&;
+
+    /** @brief Track color (filled arc portion showing value) */
     KnobWidget& trackColor(uint32_t color) &;
     KnobWidget trackColor(uint32_t color) &&;
 
+    /** @brief Value indicator color (line + center circle) */
     KnobWidget& valueColor(uint32_t color) &;
     KnobWidget valueColor(uint32_t color) &&;
+
+    /** @brief Flash color for inner circle on value change */
+    KnobWidget& flashColor(uint32_t color) &;
+    KnobWidget flashColor(uint32_t color) &&;
 
     // Data
     void setValue(float value);
@@ -68,28 +80,27 @@ public:
     void setVisible(bool visible);
 
 private:
-    static constexpr uint16_t DEFAULT_SIZE = 62;
-    static constexpr uint16_t ARC_SIZE = 62;
-    static constexpr uint16_t ARC_RADIUS = ARC_SIZE / 2;
-    static constexpr uint8_t ARC_WIDTH = 8;
-    static constexpr uint8_t INDICATOR_THICKNESS = 8;
+    // Fixed proportions (relative to knob size)
+    static constexpr uint16_t MIN_SIZE = 30;
+    static constexpr float ARC_WIDTH_RATIO = 0.13f;        // Arc width as ratio of size
+    static constexpr float INDICATOR_RATIO = 0.13f;        // Indicator thickness ratio
+    static constexpr float CENTER_CIRCLE_RATIO = 0.22f;    // Center circle size ratio
+    static constexpr float INNER_CIRCLE_RATIO = 0.10f;     // Inner circle size ratio
     static constexpr int16_t START_ANGLE = 135;
     static constexpr int16_t END_ANGLE = 45;
     static constexpr float ARC_SWEEP_DEGREES = 270.0f;
-    static constexpr uint8_t CENTER_CIRCLE_SIZE = 14;
-    static constexpr uint8_t INNER_CIRCLE_SIZE = 6;
 
     void createUI();
     void createArc();
     void createIndicator();
     void createCenterCircles();
-    void setupDragInteraction();
     void applyColors();
+    void updateGeometry();
     void updateArc();
     void updateIndicatorLine(float angleRad);
     void triggerFlash();
     static void flashTimerCallback(lv_timer_t* timer);
-    static void dragEventCallback(lv_event_t* e);
+    static void sizeChangedCallback(lv_event_t* e);
     float normalizedToAngle(float normalized) const;
     void cleanup();
 
@@ -105,21 +116,21 @@ private:
     lv_point_precise_t line_points_[2];
 
     // Configuration
-    uint16_t width_ = DEFAULT_SIZE;
-    uint16_t height_ = DEFAULT_SIZE;
-    uint8_t color_index_ = 255;  // 255 = no macro color
+    uint32_t bg_color_ = 0;
     uint32_t track_color_ = 0;
     uint32_t value_color_ = 0;
+    uint32_t flash_color_ = 0;
 
     // State
     float value_ = 0.0f;
     float origin_ = 0.0f;
     bool centered_ = false;
-    lv_coord_t drag_start_y_ = 0;
 
-    // Cached geometry
+    // Cached geometry (computed from actual size)
+    lv_coord_t knob_size_ = 0;
     lv_coord_t arc_center_x_ = 0;
     lv_coord_t arc_center_y_ = 0;
+    lv_coord_t arc_radius_ = 0;
 };
 
 }  // namespace oc::ui::lvgl

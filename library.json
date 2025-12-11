@@ -20,7 +20,7 @@
         "open-control/ui-lvgl": ">=0.1.0"
     },
     "build": {
-        "srcFilter": ["+<*>", "+<widget/>"],
+        "srcFilter": ["+<*>", "+<widget/>", "+<component/>"],
         "includeDir": "include",
         "srcDir": "src",
         "flags": ["-std=gnu++17"]

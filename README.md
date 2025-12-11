@@ -23,8 +23,11 @@ Reusable LVGL UI components for the **open-control** framework - an open-source 
 
 | Widget | Description |
 |--------|-------------|
-| `KnobWidget` | Rotary arc knob with value indicator |
-| `ScrollLabel` | Label with auto-scroll for overflow text |
+| `KnobWidget` | Rotary arc knob with value indicator (auto-flash on value change) |
+| `ListItemWidget` | Container with indicator line and content area (manual flash) |
+| `ButtonWidget` | Toggle button with ON/OFF states |
+| `StateIndicator` | Circular LED-style state indicator |
+| `Label` | Label with optional auto-scroll for overflow text |
 
 ## Quick Start - SDL Demo
 
@@ -153,7 +156,7 @@ lib_deps =
 
 ## Usage
 
-### Simple
+### KnobWidget
 
 ```cpp
 #include <oc/ui/lvgl/widget/KnobWidget.hpp>
@@ -161,18 +164,53 @@ lib_deps =
 using namespace oc::ui::lvgl;
 
 KnobWidget knob(parent);
-knob.setName("Cutoff");
-knob.setValue(0.5f);
+knob.trackColor(0xFCEB23)
+    .valueColor(0x909090)
+    .flashColor(0xECA747)
+    .centered(true);
+knob.setValue(0.5f);  // Auto-flash on value change
 ```
 
-### Fluent Configuration
+### ListItemWidget
 
 ```cpp
-KnobWidget knob = KnobWidget(parent)
-    .size(80, 120)
-    .centered(true)
-    .origin(0.5f)
-    .trackColor(0x606060);
+#include <oc/ui/lvgl/widget/ListItemWidget.hpp>
+
+ListItemWidget item(parent);
+item.lineColor(0x606060)
+    .flashColor(0xECA747);
+
+// Add content to inner()
+lv_obj_t* label = lv_label_create(item.inner());
+lv_label_set_text(label, "Sine Wave");
+
+item.triggerFlash();  // Manual flash
+```
+
+### ButtonWidget
+
+```cpp
+#include <oc/ui/lvgl/widget/ButtonWidget.hpp>
+
+ButtonWidget button(parent);
+button.offColor(0x333333)
+      .onColor(0xECA747)
+      .textOffColor(0xFFFFFF)
+      .textOnColor(0x292929);
+button.setText("OFF");
+button.setState(true);  // Changes to ON state
+```
+
+### StateIndicator
+
+```cpp
+#include <oc/ui/lvgl/widget/StateIndicator.hpp>
+
+StateIndicator indicator(parent, 12);
+indicator.color(StateIndicator::State::OFF, 0x606060)
+         .color(StateIndicator::State::ACTIVE, 0x00FF00)
+         .opacity(StateIndicator::State::OFF, LV_OPA_60);
+indicator.setState(StateIndicator::State::ACTIVE);
 ```
 
 ### Direct LVGL Access

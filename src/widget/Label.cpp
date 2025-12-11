@@ -1,4 +1,4 @@
-#include <oc/ui/lvgl/widget/ScrollLabel.hpp>
+#include <oc/ui/lvgl/widget/Label.hpp>
 
 namespace oc::ui::lvgl {
 
@@ -6,16 +6,16 @@ namespace oc::ui::lvgl {
 // Construction / Destruction
 // =============================================================================
 
-ScrollLabel::ScrollLabel(lv_obj_t* parent) {
+Label::Label(lv_obj_t* parent) {
     createWidgets(parent);
 }
 
-ScrollLabel::~ScrollLabel() {
+Label::~Label() {
     stopScrollAnimation();
     cleanup();
 }
 
-ScrollLabel::ScrollLabel(ScrollLabel&& other) noexcept
+Label::Label(Label&& other) noexcept
     : container_(other.container_),
       label_(other.label_),
       auto_scroll_enabled_(other.auto_scroll_enabled_),
@@ -29,7 +29,7 @@ ScrollLabel::ScrollLabel(ScrollLabel&& other) noexcept
     other.anim_running_ = false;
 }
 
-ScrollLabel& ScrollLabel::operator=(ScrollLabel&& other) noexcept {
+Label& Label::operator=(Label&& other) noexcept {
     if (this != &other) {
         stopScrollAnimation();
         cleanup();
@@ -50,26 +50,27 @@ ScrollLabel& ScrollLabel::operator=(ScrollLabel&& other) noexcept {
     return *this;
 }
 
-void ScrollLabel::createWidgets(lv_obj_t* parent) {
+void Label::createWidgets(lv_obj_t* parent) {
     // Container that clips overflow
     container_ = lv_obj_create(parent);
-    lv_obj_set_height(container_, LV_SIZE_CONTENT);
-    lv_obj_set_width(container_, 0);
-    lv_obj_set_flex_grow(container_, 1);
+    // Default size: 100% width, content height (for flex/grid)
+    lv_obj_set_size(container_, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(container_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    // Clip overflow for scroll animation
+    lv_obj_clear_flag(container_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
-    // The actual label
+    // The actual label - full width, content height
     label_ = lv_label_create(container_);
     lv_label_set_text(label_, "");
+    lv_obj_set_width(label_, LV_SIZE_CONTENT);
     lv_obj_set_style_pad_all(label_, 0, 0);
     lv_label_set_long_mode(label_, LV_LABEL_LONG_CLIP);
 }
 
-void ScrollLabel::cleanup() {
+void Label::cleanup() {
     if (container_) {
         lv_obj_delete(container_);
         container_ = nullptr;
@@ -81,25 +82,25 @@ void ScrollLabel::cleanup() {
 // Fluent Configuration
 // =============================================================================
 
-ScrollLabel& ScrollLabel::autoScroll(bool enabled) & {
+Label& Label::autoScroll(bool enabled) & {
     auto_scroll_enabled_ = enabled;
     return *this;
 }
 
-ScrollLabel ScrollLabel::autoScroll(bool enabled) && {
+Label Label::autoScroll(bool enabled) && {
     return std::move(autoScroll(enabled));
 }
 
-ScrollLabel& ScrollLabel::alignment(lv_text_align_t align) & {
+Label& Label::alignment(lv_text_align_t align) & {
     alignment_ = align;
     return *this;
 }
 
-ScrollLabel ScrollLabel::alignment(lv_text_align_t align) && {
+Label Label::alignment(lv_text_align_t align) && {
     return std::move(alignment(align));
 }
 
-ScrollLabel& ScrollLabel::flexGrow(bool enabled) & {
+Label& Label::flexGrow(bool enabled) & {
     if (container_) {
         if (enabled) {
             lv_obj_set_width(container_, 0);
@@ -112,66 +113,71 @@ ScrollLabel& ScrollLabel::flexGrow(bool enabled) & {
     return *this;
 }
 
-ScrollLabel ScrollLabel::flexGrow(bool enabled) && {
+Label Label::flexGrow(bool enabled) && {
     return std::move(flexGrow(enabled));
 }
 
-ScrollLabel& ScrollLabel::color(uint32_t c) & {
+Label& Label::color(uint32_t c) & {
     if (label_) {
         lv_obj_set_style_text_color(label_, lv_color_hex(c), 0);
     }
     return *this;
 }
 
-ScrollLabel ScrollLabel::color(uint32_t c) && {
+Label Label::color(uint32_t c) && {
     return std::move(color(c));
 }
 
-ScrollLabel& ScrollLabel::font(const lv_font_t* f) & {
+Label& Label::font(const lv_font_t* f) & {
     if (label_ && f) {
         lv_obj_set_style_text_font(label_, f, 0);
     }
     return *this;
 }
 
-ScrollLabel ScrollLabel::font(const lv_font_t* f) && {
+Label Label::font(const lv_font_t* f) && {
     return std::move(font(f));
+}
+
+Label& Label::width(lv_coord_t w) & {
+    if (container_) {
+        lv_obj_set_flex_grow(container_, 0);
+        lv_obj_set_width(container_, w);
+    }
+    return *this;
+}
+
+Label Label::width(lv_coord_t w) && {
+    return std::move(width(w));
 }
 
 // =============================================================================
 // Data Setters
 // =============================================================================
 
-void ScrollLabel::setText(const std::string& text) {
+void Label::setText(const std::string& text) {
     setText(text.c_str());
 }
 
-void ScrollLabel::setText(const char* text) {
+void Label::setText(const char* text) {
     if (!label_) return;
 
     stopScrollAnimation();
-    lv_obj_set_pos(label_, 0, 0);
     lv_label_set_text(label_, text);
 
     // Defer overflow check to next frame when layout is ready
-    if (auto_scroll_enabled_) {
-        lv_timer_t* timer = lv_timer_create(
-            [](lv_timer_t* t) {
-                auto* self = static_cast<ScrollLabel*>(lv_timer_get_user_data(t));
-                if (self) {
-                    self->checkOverflowAndScroll();
-                }
-            },
-            BaseTheme::Animation::OVERFLOW_CHECK_DELAY_MS, this);
-        lv_timer_set_repeat_count(timer, 1);
-    }
+    lv_timer_t* timer = lv_timer_create([](lv_timer_t* t) {
+        auto* self = static_cast<Label*>(lv_timer_get_user_data(t));
+        if (self) self->checkOverflowAndScroll();
+    }, 0, this);
+    lv_timer_set_repeat_count(timer, 1);
 }
 
 // =============================================================================
 // Scroll Animation
 // =============================================================================
 
-void ScrollLabel::checkOverflowAndScroll() {
+void Label::checkOverflowAndScroll() {
     if (!label_ || !container_) return;
 
     // Measure text width
@@ -210,7 +216,7 @@ void ScrollLabel::checkOverflowAndScroll() {
     }
 }
 
-void ScrollLabel::startScrollAnimation() {
+void Label::startScrollAnimation() {
     if (!label_ || anim_running_ || overflow_amount_ <= 0) return;
 
     lv_anim_init(&scroll_anim_);
@@ -221,7 +227,7 @@ void ScrollLabel::startScrollAnimation() {
     lv_anim_set_delay(&scroll_anim_, BaseTheme::Animation::SCROLL_START_DELAY_MS);
     lv_anim_set_path_cb(&scroll_anim_, lv_anim_path_ease_in_out);
     lv_anim_set_completed_cb(&scroll_anim_, [](lv_anim_t* a) {
-        auto* self = static_cast<ScrollLabel*>(a->var);
+        auto* self = static_cast<Label*>(a->var);
         lv_timer_t* timer = lv_timer_create(pauseTimerCallback, self->pause_duration_ms_, self);
         lv_timer_set_repeat_count(timer, 1);
     });
@@ -230,22 +236,22 @@ void ScrollLabel::startScrollAnimation() {
     anim_running_ = true;
 }
 
-void ScrollLabel::stopScrollAnimation() {
+void Label::stopScrollAnimation() {
     if (anim_running_) {
         lv_anim_delete(this, nullptr);
         anim_running_ = false;
     }
 }
 
-void ScrollLabel::scrollAnimCallback(void* var, int32_t value) {
-    auto* self = static_cast<ScrollLabel*>(var);
+void Label::scrollAnimCallback(void* var, int32_t value) {
+    auto* self = static_cast<Label*>(var);
     if (self->label_) {
         lv_obj_set_x(self->label_, value);
     }
 }
 
-void ScrollLabel::pauseTimerCallback(lv_timer_t* timer) {
-    auto* self = static_cast<ScrollLabel*>(lv_timer_get_user_data(timer));
+void Label::pauseTimerCallback(lv_timer_t* timer) {
+    auto* self = static_cast<Label*>(lv_timer_get_user_data(timer));
     if (!self || !self->label_) return;
 
     lv_anim_t anim;
@@ -256,7 +262,7 @@ void ScrollLabel::pauseTimerCallback(lv_timer_t* timer) {
     lv_anim_set_duration(&anim, self->scroll_duration_ms_);
     lv_anim_set_path_cb(&anim, lv_anim_path_ease_in_out);
     lv_anim_set_completed_cb(&anim, [](lv_anim_t* a) {
-        auto* self = static_cast<ScrollLabel*>(a->var);
+        auto* self = static_cast<Label*>(a->var);
         self->anim_running_ = false;
     });
 

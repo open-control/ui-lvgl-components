@@ -11,21 +11,21 @@
 namespace oc::ui::lvgl {
 
 /**
- * @brief Label widget with automatic horizontal scrolling for overflow text
+ * @brief Label widget with optional auto-scroll for overflow text
  *
  * Features:
- * - Auto-scroll animation when text exceeds container width
+ * - Optional auto-scroll animation when text exceeds container width
  * - Configurable scroll timing and delays
  * - Flex-grow support for layout integration
  * - Full LVGL compatibility
  *
  * Usage:
  * @code
- * ScrollLabel label(parent);
+ * Label label(parent);
  * label.setText("This is a very long text that will scroll");
  *
  * // Fluent configuration
- * ScrollLabel label = ScrollLabel(parent)
+ * Label label = Label(parent)
  *     .autoScroll(true)
  *     .alignment(LV_TEXT_ALIGN_CENTER);
  *
@@ -33,20 +33,20 @@ namespace oc::ui::lvgl {
  * lv_obj_set_style_text_color(label, lv_color_hex(0xFF0000), 0);
  * @endcode
  */
-class ScrollLabel : public IWidget {
+class Label : public IWidget {
 public:
     // =========================================================================
     // Construction / Destruction
     // =========================================================================
 
-    explicit ScrollLabel(lv_obj_t* parent);
-    ~ScrollLabel();
+    explicit Label(lv_obj_t* parent);
+    ~Label();
 
     // Move only
-    ScrollLabel(ScrollLabel&& other) noexcept;
-    ScrollLabel& operator=(ScrollLabel&& other) noexcept;
-    ScrollLabel(const ScrollLabel&) = delete;
-    ScrollLabel& operator=(const ScrollLabel&) = delete;
+    Label(Label&& other) noexcept;
+    Label& operator=(Label&& other) noexcept;
+    Label(const Label&) = delete;
+    Label& operator=(const Label&) = delete;
 
     // =========================================================================
     // LVGL Access
@@ -66,24 +66,28 @@ public:
     // =========================================================================
 
     /** @brief Enable/disable auto-scroll */
-    ScrollLabel& autoScroll(bool enabled) &;
-    ScrollLabel autoScroll(bool enabled) &&;
+    Label& autoScroll(bool enabled) &;
+    Label autoScroll(bool enabled) &&;
 
     /** @brief Set text alignment (when not scrolling) */
-    ScrollLabel& alignment(lv_text_align_t align) &;
-    ScrollLabel alignment(lv_text_align_t align) &&;
+    Label& alignment(lv_text_align_t align) &;
+    Label alignment(lv_text_align_t align) &&;
 
     /** @brief Enable flex-grow for layout */
-    ScrollLabel& flexGrow(bool enabled) &;
-    ScrollLabel flexGrow(bool enabled) &&;
+    Label& flexGrow(bool enabled) &;
+    Label flexGrow(bool enabled) &&;
 
     /** @brief Set text color */
-    ScrollLabel& color(uint32_t c) &;
-    ScrollLabel color(uint32_t c) &&;
+    Label& color(uint32_t c) &;
+    Label color(uint32_t c) &&;
 
     /** @brief Set font */
-    ScrollLabel& font(const lv_font_t* f) &;
-    ScrollLabel font(const lv_font_t* f) &&;
+    Label& font(const lv_font_t* f) &;
+    Label font(const lv_font_t* f) &&;
+
+    /** @brief Set fixed width (disables flex-grow, enables auto-scroll) */
+    Label& width(lv_coord_t w) &;
+    Label width(lv_coord_t w) &&;
 
     // =========================================================================
     // Data Setters
