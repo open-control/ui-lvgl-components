@@ -161,6 +161,13 @@ void Label::setText(const char* text) {
 void Label::checkOverflowAndScroll() {
     if (!label_ || !container_) return;
 
+    // Ensure container layout is computed first
+    lv_obj_update_layout(container_);
+    lv_coord_t container_width = lv_obj_get_width(container_);
+
+    // Skip if container has no width yet (layout not ready)
+    if (container_width <= 0) return;
+
     // Measure text width
     lv_label_set_long_mode(label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(label_, LV_SIZE_CONTENT);
@@ -169,8 +176,6 @@ void Label::checkOverflowAndScroll() {
 
     // Restore clip mode
     lv_label_set_long_mode(label_, LV_LABEL_LONG_CLIP);
-
-    lv_coord_t container_width = lv_obj_get_width(container_);
     overflow_amount_ = text_width - container_width;
 
     if (overflow_amount_ > 0) {

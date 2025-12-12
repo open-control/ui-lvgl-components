@@ -108,9 +108,11 @@ private:
     float origin_ = 0.0f;
     bool centered_ = false;
 
-    // Cached geometry (computed from actual size)
-    lv_coord_t knob_size_ = 0;
-    lv_coord_t arc_radius_ = 0;
+    // Cached geometry (computed from actual size) - all float for precision
+    float knob_size_ = 0.0f;
+    float arc_radius_ = 0.0f;
+    float indicator_thickness_ = 0.0f;
+    float center_ = 0.0f;  // knob_size_ / 2
 };
 
 }  // namespace oc::ui::lvgl
