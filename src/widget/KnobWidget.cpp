@@ -29,7 +29,9 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
       origin_(other.origin_),
       centered_(other.centered_),
       knob_size_(other.knob_size_),
-      arc_radius_(other.arc_radius_) {
+      arc_radius_(other.arc_radius_),
+      indicator_thickness_(other.indicator_thickness_),
+      center_(other.center_) {
     line_points_[0] = other.line_points_[0];
     line_points_[1] = other.line_points_[1];
     other.container_ = nullptr;
@@ -60,6 +62,8 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         centered_ = other.centered_;
         knob_size_ = other.knob_size_;
         arc_radius_ = other.arc_radius_;
+        indicator_thickness_ = other.indicator_thickness_;
+        center_ = other.center_;
         other.container_ = nullptr;
         other.arc_ = nullptr;
         other.indicator_ = nullptr;
@@ -174,46 +178,48 @@ void KnobWidget::updateGeometry() {
     lv_obj_update_layout(parent);
 
     // Get parent content size (the ParameterKnob container)
-    lv_coord_t parent_w = lv_obj_get_content_width(parent);
-    lv_coord_t parent_h = lv_obj_get_content_height(parent);
+    float parent_w = static_cast<float>(lv_obj_get_content_width(parent));
+    float parent_h = static_cast<float>(lv_obj_get_content_height(parent));
 
     // Skip if size not yet determined
-    if (parent_w <= 0 || parent_h <= 0) return;
+    if (parent_w <= 0.0f || parent_h <= 0.0f) return;
 
     // Find sibling label to get its height (row 1 uses CONTENT height)
-    lv_coord_t label_h = 0;
+    float label_h = 0.0f;
     uint32_t child_count = lv_obj_get_child_count(parent);
     for (uint32_t i = 0; i < child_count; i++) {
         lv_obj_t* child = lv_obj_get_child(parent, i);
         if (child != container_) {
-            // This is the label - get its height
-            label_h = lv_obj_get_height(child);
+            label_h = static_cast<float>(lv_obj_get_height(child));
             break;
         }
     }
 
     // Available space for knob = parent height - label height
-    lv_coord_t available_w = parent_w;
-    lv_coord_t available_h = parent_h - label_h;
+    float available_w = parent_w;
+    float available_h = parent_h - label_h;
 
     // Use min(width, height) for square knob, enforce minimum
-    knob_size_ = std::max(static_cast<lv_coord_t>(MIN_SIZE), std::min(available_w, available_h));
+    // Round down to even number for perfect centering (int division by 2)
+    float raw_size = std::max(static_cast<float>(MIN_SIZE), std::min(available_w, available_h));
+    knob_size_ = static_cast<float>(static_cast<int>(raw_size) & ~1);  // Clear LSB = even
+    center_ = knob_size_ / 2.0f;
 
-    // Set container to square size (grid CENTER will position it)
-    lv_obj_set_size(container_, knob_size_, knob_size_);
+    // Set container to square size (grid will position it)
+    lv_obj_set_size(container_, static_cast<lv_coord_t>(knob_size_), static_cast<lv_coord_t>(knob_size_));
 
     // All sizes proportional to knob_size_
-    // Indicator extent from center = arc_radius_ + indicator_thickness/2 must fit in knob_size_/2
-    // So: arc_radius_ = knob_size_ * (1 - INDICATOR_RATIO) / 2 = knob_size_ * ARC_RADIUS_RATIO
+    // Force even sizes for perfect centering with lv_obj_center()
     static constexpr float ARC_RADIUS_RATIO = (1.0f - INDICATOR_RATIO) / 2.0f;
+    auto make_even = [](float v) { return static_cast<lv_coord_t>(static_cast<int>(v) & ~1); };
 
-    lv_coord_t arc_width = static_cast<lv_coord_t>(knob_size_ * ARC_WIDTH_RATIO);
-    lv_coord_t indicator_thickness = static_cast<lv_coord_t>(knob_size_ * INDICATOR_RATIO);
-    lv_coord_t center_circle_size = static_cast<lv_coord_t>(knob_size_ * CENTER_CIRCLE_RATIO);
-    lv_coord_t inner_circle_size = static_cast<lv_coord_t>(knob_size_ * INNER_CIRCLE_RATIO);
-    arc_radius_ = static_cast<lv_coord_t>(knob_size_ * ARC_RADIUS_RATIO);
-
-    lv_coord_t arc_size = arc_radius_ * 2;
+    lv_coord_t arc_width = make_even(knob_size_ * ARC_WIDTH_RATIO);
+    lv_coord_t indicator_thickness = make_even(knob_size_ * INDICATOR_RATIO);
+    lv_coord_t center_circle_size = make_even(knob_size_ * CENTER_CIRCLE_RATIO);
+    lv_coord_t inner_circle_size = make_even(knob_size_ * INNER_CIRCLE_RATIO);
+    arc_radius_ = knob_size_ * ARC_RADIUS_RATIO;
+    indicator_thickness_ = knob_size_ * INDICATOR_RATIO;
+    lv_coord_t arc_size = make_even(arc_radius_ * 2.0f);
 
     // Update arc
     if (arc_) {
@@ -227,9 +233,8 @@ void KnobWidget::updateGeometry() {
     // Update indicator line
     if (indicator_) {
         lv_obj_set_style_line_width(indicator_, indicator_thickness, 0);
-        lv_coord_t center = knob_size_ / 2;
-        line_points_[0].x = center;
-        line_points_[0].y = center;
+        line_points_[0].x = center_;
+        line_points_[0].y = center_;
     }
 
     // Update center circles
@@ -322,7 +327,7 @@ void KnobWidget::setVisible(bool visible) {
 }
 
 void KnobWidget::updateArc() {
-    if (!arc_ || !indicator_ || arc_radius_ == 0) return;
+    if (!arc_ || !indicator_ || arc_radius_ <= 0.0f) return;
 
     float origin_angle = normalizedToAngle(origin_);
     float value_angle = normalizedToAngle(value_);
@@ -340,9 +345,13 @@ void KnobWidget::updateArc() {
 }
 
 void KnobWidget::updateIndicatorLine(float angleRad) {
-    lv_coord_t center = knob_size_ / 2;
-    line_points_[1].x = center + static_cast<lv_coord_t>(arc_radius_ * std::cos(angleRad));
-    line_points_[1].y = center + static_cast<lv_coord_t>(arc_radius_ * std::sin(angleRad));
+    // All calculations in float for precision
+    float end_x = center_ + arc_radius_ * std::cos(angleRad);
+    float end_y = center_ + arc_radius_ * std::sin(angleRad);
+
+    // Update line endpoint (lv_point_precise_t uses float)
+    line_points_[1].x = end_x;
+    line_points_[1].y = end_y;
     lv_obj_refresh_self_size(indicator_);
     lv_obj_invalidate(indicator_);
 }
