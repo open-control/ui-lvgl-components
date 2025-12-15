@@ -63,6 +63,31 @@ public:
         return *this;
     }
 
+    /**
+     * @brief Remove border
+     */
+    StyleBuilder& noBorder() {
+        lv_obj_set_style_border_width(obj_, 0, 0);
+        return *this;
+    }
+
+    /**
+     * @brief Set border width and color
+     */
+    StyleBuilder& border(int16_t width, uint32_t color) {
+        lv_obj_set_style_border_width(obj_, width, 0);
+        lv_obj_set_style_border_color(obj_, lv_color_hex(color), 0);
+        return *this;
+    }
+
+    /**
+     * @brief Set corner radius
+     */
+    StyleBuilder& radius(int16_t r) {
+        lv_obj_set_style_radius(obj_, r, 0);
+        return *this;
+    }
+
     // =========================================================================
     // Flex Layout
     // =========================================================================
@@ -140,6 +165,131 @@ public:
     StyleBuilder& padV(int16_t v) {
         lv_obj_set_style_pad_top(obj_, v, 0);
         lv_obj_set_style_pad_bottom(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set left padding
+    StyleBuilder& padLeft(int16_t v) {
+        lv_obj_set_style_pad_left(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set right padding
+    StyleBuilder& padRight(int16_t v) {
+        lv_obj_set_style_pad_right(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set top padding
+    StyleBuilder& padTop(int16_t v) {
+        lv_obj_set_style_pad_top(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set bottom padding
+    StyleBuilder& padBottom(int16_t v) {
+        lv_obj_set_style_pad_bottom(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set row gap (vertical spacing between flex items)
+    StyleBuilder& padRow(int16_t v) {
+        lv_obj_set_style_pad_row(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set column gap (horizontal spacing between flex items)
+    StyleBuilder& padColumn(int16_t v) {
+        lv_obj_set_style_pad_column(obj_, v, 0);
+        return *this;
+    }
+
+    // =========================================================================
+    // Margin
+    // =========================================================================
+
+    /// Set margin on all sides
+    StyleBuilder& margin(int16_t all) {
+        lv_obj_set_style_margin_left(obj_, all, 0);
+        lv_obj_set_style_margin_right(obj_, all, 0);
+        lv_obj_set_style_margin_top(obj_, all, 0);
+        lv_obj_set_style_margin_bottom(obj_, all, 0);
+        return *this;
+    }
+
+    /// Set horizontal margin (left + right)
+    StyleBuilder& marginH(int16_t h) {
+        lv_obj_set_style_margin_left(obj_, h, 0);
+        lv_obj_set_style_margin_right(obj_, h, 0);
+        return *this;
+    }
+
+    /// Set vertical margin (top + bottom)
+    StyleBuilder& marginV(int16_t v) {
+        lv_obj_set_style_margin_top(obj_, v, 0);
+        lv_obj_set_style_margin_bottom(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set left margin
+    StyleBuilder& marginLeft(int16_t v) {
+        lv_obj_set_style_margin_left(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set right margin
+    StyleBuilder& marginRight(int16_t v) {
+        lv_obj_set_style_margin_right(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set top margin
+    StyleBuilder& marginTop(int16_t v) {
+        lv_obj_set_style_margin_top(obj_, v, 0);
+        return *this;
+    }
+
+    /// Set bottom margin
+    StyleBuilder& marginBottom(int16_t v) {
+        lv_obj_set_style_margin_bottom(obj_, v, 0);
+        return *this;
+    }
+
+    // =========================================================================
+    // Text
+    // =========================================================================
+
+    /// Set text font
+    StyleBuilder& textFont(const lv_font_t* font) {
+        lv_obj_set_style_text_font(obj_, font, 0);
+        return *this;
+    }
+
+    /// Set text alignment
+    StyleBuilder& textAlign(lv_text_align_t align) {
+        lv_obj_set_style_text_align(obj_, align, 0);
+        return *this;
+    }
+
+    /// Set text opacity
+    StyleBuilder& textOpa(lv_opa_t opa) {
+        lv_obj_set_style_text_opa(obj_, opa, 0);
+        return *this;
+    }
+
+    // =========================================================================
+    // Opacity
+    // =========================================================================
+
+    /// Set global opacity
+    StyleBuilder& opa(lv_opa_t o) {
+        lv_obj_set_style_opa(obj_, o, 0);
+        return *this;
+    }
+
+    /// Set background opacity only
+    StyleBuilder& bgOpa(lv_opa_t o) {
+        lv_obj_set_style_bg_opa(obj_, o, 0);
         return *this;
     }
 
