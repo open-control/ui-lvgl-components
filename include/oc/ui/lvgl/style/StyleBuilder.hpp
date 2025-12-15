@@ -43,6 +43,26 @@ public:
         return *this;
     }
 
+    /**
+     * @brief Set background color
+     * @param color Hex color (e.g., 0xFF0000 for red)
+     * @param opa Opacity (default: fully opaque)
+     */
+    StyleBuilder& bgColor(uint32_t color, lv_opa_t opa = LV_OPA_COVER) {
+        lv_obj_set_style_bg_color(obj_, lv_color_hex(color), 0);
+        lv_obj_set_style_bg_opa(obj_, opa, 0);
+        return *this;
+    }
+
+    /**
+     * @brief Set text color
+     * @param color Hex color (e.g., 0xFFFFFF for white)
+     */
+    StyleBuilder& textColor(uint32_t color) {
+        lv_obj_set_style_text_color(obj_, lv_color_hex(color), 0);
+        return *this;
+    }
+
     // =========================================================================
     // Flex Layout
     // =========================================================================
