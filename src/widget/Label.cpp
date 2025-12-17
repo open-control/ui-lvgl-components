@@ -18,14 +18,21 @@ Label::~Label() {
 Label::Label(Label&& other) noexcept
     : container_(other.container_),
       label_(other.label_),
+      pending_timer_(other.pending_timer_),
       auto_scroll_enabled_(other.auto_scroll_enabled_),
       anim_running_(other.anim_running_),
+      owns_lvgl_objects_(other.owns_lvgl_objects_),
       overflow_amount_(other.overflow_amount_),
       alignment_(other.alignment_),
       scroll_duration_ms_(other.scroll_duration_ms_),
       pause_duration_ms_(other.pause_duration_ms_) {
+    // Update timer's user_data to point to new object
+    if (pending_timer_) {
+        lv_timer_set_user_data(pending_timer_, this);
+    }
     other.container_ = nullptr;
     other.label_ = nullptr;
+    other.pending_timer_ = nullptr;
     other.anim_running_ = false;
 }
 
@@ -36,15 +43,23 @@ Label& Label::operator=(Label&& other) noexcept {
 
         container_ = other.container_;
         label_ = other.label_;
+        pending_timer_ = other.pending_timer_;
         auto_scroll_enabled_ = other.auto_scroll_enabled_;
         anim_running_ = other.anim_running_;
+        owns_lvgl_objects_ = other.owns_lvgl_objects_;
         overflow_amount_ = other.overflow_amount_;
         alignment_ = other.alignment_;
         scroll_duration_ms_ = other.scroll_duration_ms_;
         pause_duration_ms_ = other.pause_duration_ms_;
 
+        // Update timer's user_data to point to new object
+        if (pending_timer_) {
+            lv_timer_set_user_data(pending_timer_, this);
+        }
+
         other.container_ = nullptr;
         other.label_ = nullptr;
+        other.pending_timer_ = nullptr;
         other.anim_running_ = false;
     }
     return *this;
@@ -53,7 +68,8 @@ Label& Label::operator=(Label&& other) noexcept {
 void Label::createWidgets(lv_obj_t* parent) {
     // Container that clips overflow
     container_ = lv_obj_create(parent);
-    // Default size: 100% width, content height (for flex/grid)
+    // Default size: 100% width, content height
+    // Works with flex layouts and grid rows using LV_GRID_CONTENT
     lv_obj_set_size(container_, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
@@ -76,11 +92,16 @@ void Label::createWidgets(lv_obj_t* parent) {
 }
 
 void Label::cleanup() {
-    if (container_) {
-        lv_obj_delete(container_);
-        container_ = nullptr;
-        label_ = nullptr;
+    // Cancel any pending timer to prevent use-after-free
+    if (pending_timer_) {
+        lv_timer_delete(pending_timer_);
+        pending_timer_ = nullptr;
     }
+    if (container_ && owns_lvgl_objects_) {
+        lv_obj_delete(container_);
+    }
+    container_ = nullptr;
+    label_ = nullptr;
 }
 
 // =============================================================================
@@ -132,6 +153,21 @@ Label& Label::width(lv_coord_t w) {
     return *this;
 }
 
+Label& Label::ownsLvglObjects(bool owns) {
+    owns_lvgl_objects_ = owns;
+    return *this;
+}
+
+Label& Label::gridCell(uint8_t col, uint8_t colSpan, uint8_t row, uint8_t rowSpan,
+                       lv_grid_align_t vAlign) {
+    if (container_) {
+        // Always STRETCH horizontally - LV_PCT(100) containers don't work with GRID_ALIGN_END
+        // Use alignment() for text positioning (LEFT/CENTER/RIGHT)
+        lv_obj_set_grid_cell(container_, LV_GRID_ALIGN_STRETCH, col, colSpan, vAlign, row, rowSpan);
+    }
+    return *this;
+}
+
 // =============================================================================
 // Data Setters
 // =============================================================================
@@ -140,18 +176,51 @@ void Label::setText(const std::string& text) {
     setText(text.c_str());
 }
 
+void Label::setText(int value, const char* prefix, const char* suffix) {
+    if (!label_) return;
+    stopScrollAnimation();
+    lv_label_set_text_fmt(label_, "%s%d%s", prefix, value, suffix);
+    if (auto_scroll_enabled_) {
+        checkOverflowAndScroll();
+    } else {
+        applyStaticAlignment();
+    }
+}
+
+void Label::setText(float value, uint8_t decimals, const char* prefix, const char* suffix) {
+    if (!label_) return;
+    stopScrollAnimation();
+    char fmt[16];
+    lv_snprintf(fmt, sizeof(fmt), "%%s%%.%uf%%s", decimals);
+    lv_label_set_text_fmt(label_, fmt, prefix, value, suffix);
+    if (auto_scroll_enabled_) {
+        checkOverflowAndScroll();
+    } else {
+        applyStaticAlignment();
+    }
+}
+
 void Label::setText(const char* text) {
     if (!label_) return;
 
     stopScrollAnimation();
     lv_label_set_text(label_, text);
 
+    // Cancel any previous pending timer
+    if (pending_timer_) {
+        lv_timer_delete(pending_timer_);
+        pending_timer_ = nullptr;
+    }
+
     // Defer overflow check to next frame when layout is ready
-    lv_timer_t* timer = lv_timer_create([](lv_timer_t* t) {
+    pending_timer_ = lv_timer_create([](lv_timer_t* t) {
         auto* self = static_cast<Label*>(lv_timer_get_user_data(t));
-        if (self) self->checkOverflowAndScroll();
+        if (self) {
+            self->pending_timer_ = nullptr;  // Clear before callback
+            self->checkOverflowAndScroll();
+        }
     }, 0, this);
-    lv_timer_set_repeat_count(timer, 1);
+    lv_timer_set_repeat_count(pending_timer_, 1);
 }
 
 // =============================================================================
@@ -161,12 +230,34 @@ void Label::setText(const char* text) {
 void Label::checkOverflowAndScroll() {
     if (!label_ || !container_) return;
 
-    // Ensure container layout is computed first
+    // Update full layout hierarchy to ensure dimensions are computed
+    lv_obj_t* parent = lv_obj_get_parent(container_);
+    if (parent) {
+        lv_obj_t* grandparent = lv_obj_get_parent(parent);
+        if (grandparent) {
+            lv_obj_update_layout(grandparent);
+        } else {
+            lv_obj_update_layout(parent);
+        }
+    }
     lv_obj_update_layout(container_);
+
     lv_coord_t container_width = lv_obj_get_width(container_);
 
-    // Skip if container has no width yet (layout not ready)
-    if (container_width <= 0) return;
+    // Still no width? Schedule retry - layout not ready yet
+    if (container_width <= 0) {
+        if (!pending_timer_) {
+            pending_timer_ = lv_timer_create([](lv_timer_t* t) {
+                auto* self = static_cast<Label*>(lv_timer_get_user_data(t));
+                if (self) {
+                    self->pending_timer_ = nullptr;
+                    self->checkOverflowAndScroll();
+                }
+            }, 10, this);  // Retry after 10ms
+            lv_timer_set_repeat_count(pending_timer_, 1);
+        }
+        return;
+    }
 
     // Measure text width
     lv_label_set_long_mode(label_, LV_LABEL_LONG_WRAP);
@@ -227,6 +318,24 @@ void Label::stopScrollAnimation() {
         lv_anim_delete(this, nullptr);
         anim_running_ = false;
     }
+}
+
+void Label::applyStaticAlignment() {
+    if (!label_ || !container_) return;
+
+    lv_align_t align;
+    switch (alignment_) {
+        case LV_TEXT_ALIGN_RIGHT:
+            align = LV_ALIGN_RIGHT_MID;
+            break;
+        case LV_TEXT_ALIGN_CENTER:
+            align = LV_ALIGN_CENTER;
+            break;
+        default:
+            align = LV_ALIGN_LEFT_MID;
+            break;
+    }
+    lv_obj_align(label_, align, 0, 0);
 }
 
 void Label::scrollAnimCallback(void* var, int32_t value) {
