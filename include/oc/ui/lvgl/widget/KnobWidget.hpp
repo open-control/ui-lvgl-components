@@ -56,9 +56,16 @@ public:
     KnobWidget& valueColor(uint32_t color);  ///< Indicator line + center
     KnobWidget& flashColor(uint32_t color);  ///< Flash on value change
 
+    // Ribbon Configuration (modulated value arc)
+    KnobWidget& ribbonColor(uint32_t color);         ///< Ribbon arc color
+    KnobWidget& ribbonOpacity(lv_opa_t opa);         ///< Ribbon opacity (default: LV_OPA_COVER)
+    KnobWidget& ribbonThickness(float ratio);        ///< Thickness relative to main arc (0.0-1.0, default: 0.8)
+
     // Data
     void setValue(float value);
     float getValue() const { return value_; }
+    void setRibbonValue(float value);                ///< Set ribbon position (auto-enables ribbon)
+    void setRibbonEnabled(bool enabled);             ///< Show/hide ribbon arc
     void setVisible(bool visible);
 
 private:
@@ -74,11 +81,14 @@ private:
 
     void createUI();
     void createArc();
+    void createRibbon();
     void createIndicator();
     void createCenterCircles();
     void applyColors();
+    void applyRibbonColors();
     void updateGeometry();
     void updateArc();
+    void updateRibbon();
     void updateIndicatorLine(float angleRad);
     void triggerFlash();
     static void flashTimerCallback(lv_timer_t* timer);
@@ -89,6 +99,7 @@ private:
     // LVGL objects
     lv_obj_t* container_ = nullptr;
     lv_obj_t* arc_ = nullptr;
+    lv_obj_t* ribbon_arc_ = nullptr;
     lv_obj_t* indicator_ = nullptr;
     lv_obj_t* center_circle_ = nullptr;
     lv_obj_t* inner_circle_ = nullptr;
@@ -103,10 +114,17 @@ private:
     uint32_t value_color_ = 0;
     uint32_t flash_color_ = 0;
 
+    // Ribbon configuration
+    uint32_t ribbon_color_ = 0;
+    lv_opa_t ribbon_opa_ = LV_OPA_COVER;
+    float ribbon_thickness_ratio_ = 0.8f;
+
     // State
     float value_ = 0.0f;
     float origin_ = 0.0f;
+    float ribbon_value_ = 0.0f;
     bool centered_ = false;
+    bool ribbon_enabled_ = false;
 
     // Cached geometry (computed from actual size) - all float for precision
     float knob_size_ = 0.0f;

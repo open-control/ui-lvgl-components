@@ -17,6 +17,7 @@ KnobWidget::~KnobWidget() {
 KnobWidget::KnobWidget(KnobWidget&& other) noexcept
     : container_(other.container_),
       arc_(other.arc_),
+      ribbon_arc_(other.ribbon_arc_),
       indicator_(other.indicator_),
       center_circle_(other.center_circle_),
       inner_circle_(other.inner_circle_),
@@ -25,9 +26,14 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
       track_color_(other.track_color_),
       value_color_(other.value_color_),
       flash_color_(other.flash_color_),
+      ribbon_color_(other.ribbon_color_),
+      ribbon_opa_(other.ribbon_opa_),
+      ribbon_thickness_ratio_(other.ribbon_thickness_ratio_),
       value_(other.value_),
       origin_(other.origin_),
+      ribbon_value_(other.ribbon_value_),
       centered_(other.centered_),
+      ribbon_enabled_(other.ribbon_enabled_),
       knob_size_(other.knob_size_),
       arc_radius_(other.arc_radius_),
       indicator_thickness_(other.indicator_thickness_),
@@ -36,6 +42,7 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
     line_points_[1] = other.line_points_[1];
     other.container_ = nullptr;
     other.arc_ = nullptr;
+    other.ribbon_arc_ = nullptr;
     other.indicator_ = nullptr;
     other.center_circle_ = nullptr;
     other.inner_circle_ = nullptr;
@@ -47,6 +54,7 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         cleanup();
         container_ = other.container_;
         arc_ = other.arc_;
+        ribbon_arc_ = other.ribbon_arc_;
         indicator_ = other.indicator_;
         center_circle_ = other.center_circle_;
         inner_circle_ = other.inner_circle_;
@@ -57,15 +65,21 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         track_color_ = other.track_color_;
         value_color_ = other.value_color_;
         flash_color_ = other.flash_color_;
+        ribbon_color_ = other.ribbon_color_;
+        ribbon_opa_ = other.ribbon_opa_;
+        ribbon_thickness_ratio_ = other.ribbon_thickness_ratio_;
         value_ = other.value_;
         origin_ = other.origin_;
+        ribbon_value_ = other.ribbon_value_;
         centered_ = other.centered_;
+        ribbon_enabled_ = other.ribbon_enabled_;
         knob_size_ = other.knob_size_;
         arc_radius_ = other.arc_radius_;
         indicator_thickness_ = other.indicator_thickness_;
         center_ = other.center_;
         other.container_ = nullptr;
         other.arc_ = nullptr;
+        other.ribbon_arc_ = nullptr;
         other.indicator_ = nullptr;
         other.center_circle_ = nullptr;
         other.inner_circle_ = nullptr;
@@ -84,6 +98,7 @@ void KnobWidget::cleanup() {
         container_ = nullptr;
     }
     arc_ = nullptr;
+    ribbon_arc_ = nullptr;
     indicator_ = nullptr;
     center_circle_ = nullptr;
     inner_circle_ = nullptr;
@@ -100,9 +115,11 @@ void KnobWidget::createUI() {
     lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
     createArc();
+    createRibbon();
     createIndicator();
     createCenterCircles();
     applyColors();
+    applyRibbonColors();
 
     // Listen for parent size changes to recalculate geometry
     lv_obj_t* parent = lv_obj_get_parent(container_);
@@ -125,6 +142,19 @@ void KnobWidget::createArc() {
     lv_obj_add_flag(arc_, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_arc_set_bg_angles(arc_, START_ANGLE, END_ANGLE);
     lv_obj_remove_style(arc_, nullptr, LV_PART_KNOB);
+}
+
+void KnobWidget::createRibbon() {
+    ribbon_arc_ = lv_arc_create(container_);
+    lv_obj_center(ribbon_arc_);
+    lv_obj_remove_flag(ribbon_arc_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(ribbon_arc_, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_arc_set_bg_angles(ribbon_arc_, START_ANGLE, END_ANGLE);
+    lv_obj_remove_style(ribbon_arc_, nullptr, LV_PART_KNOB);
+    // Hide background arc (only show indicator part)
+    lv_obj_set_style_arc_opa(ribbon_arc_, LV_OPA_TRANSP, LV_PART_MAIN);
+    // Hidden by default
+    lv_obj_add_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void KnobWidget::createIndicator() {
@@ -230,6 +260,14 @@ void KnobWidget::updateGeometry() {
         lv_obj_set_style_pad_all(arc_, arc_width / 4, LV_PART_INDICATOR);
     }
 
+    // Update ribbon arc (same size as main arc, different thickness)
+    if (ribbon_arc_) {
+        lv_obj_set_size(ribbon_arc_, arc_size, arc_size);
+        lv_obj_center(ribbon_arc_);
+        lv_coord_t ribbon_width = make_even(arc_width * ribbon_thickness_ratio_);
+        lv_obj_set_style_arc_width(ribbon_arc_, ribbon_width, LV_PART_INDICATOR);
+    }
+
     // Update indicator line
     if (indicator_) {
         lv_obj_set_style_line_width(indicator_, indicator_thickness, 0);
@@ -249,6 +287,7 @@ void KnobWidget::updateGeometry() {
 
     // Update arc value display
     updateArc();
+    updateRibbon();
 }
 
 void KnobWidget::applyColors() {
@@ -266,6 +305,13 @@ void KnobWidget::applyColors() {
     if (center_circle_) {
         lv_obj_set_style_bg_color(center_circle_, lv_color_hex(value_col), 0);
     }
+}
+
+void KnobWidget::applyRibbonColors() {
+    if (!ribbon_arc_) return;
+    uint32_t color = ribbon_color_ != 0 ? ribbon_color_ : BaseTheme::Color::MACRO_6_BLUE;
+    lv_obj_set_style_arc_color(ribbon_arc_, lv_color_hex(color), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(ribbon_arc_, ribbon_opa_, LV_PART_INDICATOR);
 }
 
 // Fluent setters
@@ -308,6 +354,24 @@ KnobWidget& KnobWidget::flashColor(uint32_t color) {
     return *this;
 }
 
+KnobWidget& KnobWidget::ribbonColor(uint32_t color) {
+    ribbon_color_ = color;
+    applyRibbonColors();
+    return *this;
+}
+
+KnobWidget& KnobWidget::ribbonOpacity(lv_opa_t opa) {
+    ribbon_opa_ = opa;
+    applyRibbonColors();
+    return *this;
+}
+
+KnobWidget& KnobWidget::ribbonThickness(float ratio) {
+    ribbon_thickness_ratio_ = std::clamp(ratio, 0.1f, 1.0f);
+    updateGeometry();
+    return *this;
+}
+
 void KnobWidget::setValue(float value) {
     float clamped = std::clamp(value, 0.0f, 1.0f);
     if (std::abs(value_ - clamped) < 0.001f) return;
@@ -323,6 +387,46 @@ void KnobWidget::setVisible(bool visible) {
         lv_obj_clear_flag(container_, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void KnobWidget::setRibbonValue(float value) {
+    float clamped = std::clamp(value, 0.0f, 1.0f);
+    ribbon_value_ = clamped;
+    // Auto-enable ribbon when value is set
+    if (!ribbon_enabled_) {
+        ribbon_enabled_ = true;
+        if (ribbon_arc_) {
+            lv_obj_clear_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    updateRibbon();
+}
+
+void KnobWidget::setRibbonEnabled(bool enabled) {
+    ribbon_enabled_ = enabled;
+    if (!ribbon_arc_) return;
+    if (enabled) {
+        lv_obj_clear_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
+        updateRibbon();
+    } else {
+        lv_obj_add_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void KnobWidget::updateRibbon() {
+    if (!ribbon_arc_ || !ribbon_enabled_ || arc_radius_ <= 0.0f) return;
+
+    float value_angle = normalizedToAngle(value_);
+    float ribbon_angle = normalizedToAngle(ribbon_value_);
+
+    // Ribbon shows between value and ribbon_value
+    if (ribbon_value_ >= value_) {
+        lv_arc_set_angles(ribbon_arc_, static_cast<int16_t>(value_angle),
+                         static_cast<int16_t>(ribbon_angle));
+    } else {
+        lv_arc_set_angles(ribbon_arc_, static_cast<int16_t>(ribbon_angle),
+                         static_cast<int16_t>(value_angle));
     }
 }
 
