@@ -16,9 +16,7 @@
     "license": "MIT",
     "frameworks": ["arduino"],
     "platforms": ["teensy", "espressif32", "ststm32"],
-    "dependencies": {
-        "open-control/ui-lvgl": "https://github.com/open-control/ui-lvgl.git#0.1.3"
-    },
+    "dependencies": {},
     "build": {
         "srcFilter": ["+<*>", "+<widget/>", "+<component/>"],
         "includeDir": "include",
