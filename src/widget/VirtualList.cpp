@@ -224,7 +224,7 @@ VirtualList& VirtualList::onUpdateHighlight(UpdateHighlightCallback callback) {
 // Data
 // ══════════════════════════════════════════════════════════════════════════════
 
-void VirtualList::setTotalCount(int count) {
+bool VirtualList::setTotalCount(int count) {
     bool changed = (totalCount_ != count);
     totalCount_ = count;
 
@@ -237,6 +237,8 @@ void VirtualList::setTotalCount(int count) {
         previousSelectedIndex_ = -1;
         rebindAllSlots();
     }
+
+    return changed;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

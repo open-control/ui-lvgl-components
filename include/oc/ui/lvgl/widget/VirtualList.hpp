@@ -183,9 +183,10 @@ public:
     /**
      * @brief Set the total number of items in the list
      *
-     * Triggers a full rebind if the visible window changes.
+     * Triggers a full rebind if the count changes.
+     * @return true if rebind was triggered (count changed)
      */
-    void setTotalCount(int count);
+    bool setTotalCount(int count);
     int getTotalCount() const { return totalCount_; }
 
     // ══════════════════════════════════════════════════════════════════
