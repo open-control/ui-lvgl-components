@@ -62,11 +62,18 @@ inline uint32_t getMacroColor(uint8_t index) {
 
 namespace Layout {
 
-// Margins (base unit: 2px)
-constexpr int16_t MARGIN_XS = 2;
-constexpr int16_t MARGIN_SM = 4;
-constexpr int16_t MARGIN_MD = 8;
-constexpr int16_t MARGIN_LG = 16;
+// Spacing scale (base unit: 2px)
+constexpr int16_t SPACE_XS = 2;
+constexpr int16_t SPACE_SM = 4;
+constexpr int16_t SPACE_MD = 8;
+constexpr int16_t SPACE_LG = 12;
+constexpr int16_t SPACE_XL = 16;
+
+// Margins (aliases for semantic use)
+constexpr int16_t MARGIN_XS = SPACE_XS;
+constexpr int16_t MARGIN_SM = SPACE_SM;
+constexpr int16_t MARGIN_MD = SPACE_MD;
+constexpr int16_t MARGIN_LG = SPACE_XL;
 
 // Button padding
 constexpr int16_t PAD_BUTTON_H = 8;
@@ -83,12 +90,36 @@ constexpr int16_t ROW_GAP_MD = 4;
 
 }  // namespace Layout
 
+// =============================================================================
+// Opacity - Semantic opacity levels
+// =============================================================================
+namespace Opacity {
+
+constexpr uint8_t OPA_FULL = 255;      // LV_OPA_COVER - fully visible
+constexpr uint8_t OPA_90 = 230;        // ~90% - modal backgrounds, overlays
+constexpr uint8_t OPA_70 = 178;        // ~70% - secondary elements, hints
+constexpr uint8_t OPA_50 = 127;        // ~50% - disabled, dimmed
+constexpr uint8_t OPA_30 = 77;         // ~30% - scrollbars, subtle hints
+constexpr uint8_t OPA_TRANSP = 0;      // LV_OPA_TRANSP - invisible
+
+}  // namespace Opacity
+
+// =============================================================================
+// Animation - Timing constants
+// =============================================================================
 namespace Animation {
 
+// Standard duration scale
+constexpr uint32_t INSTANT_MS = 0;
+constexpr uint32_t FAST_MS = 100;
+constexpr uint32_t NORMAL_MS = 300;
+constexpr uint32_t SLOW_MS = 500;
+
+// Component-specific (scroll, flash)
 constexpr uint32_t SCROLL_ANIM_MS = 50;
 constexpr uint32_t SCROLL_START_DELAY_MS = 500;
 constexpr uint32_t OVERFLOW_CHECK_DELAY_MS = 50;
-constexpr uint32_t FLASH_DURATION_MS = 100;
+constexpr uint32_t FLASH_DURATION_MS = FAST_MS;
 
 }  // namespace Animation
 
