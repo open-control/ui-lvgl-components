@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include <oc/ui/lvgl/IWidget.hpp>
+#include <oc/ui/lvgl/SquareSizePolicy.hpp>
 
 #include "../theme/BaseTheme.hpp"
 
@@ -50,6 +51,8 @@ public:
     ButtonWidget& onColor(uint32_t color);       ///< Background when ON
     ButtonWidget& textOffColor(uint32_t color);  ///< Text color when OFF
     ButtonWidget& textOnColor(uint32_t color);   ///< Text color when ON
+    ButtonWidget& sizeMode(SizeMode mode);       ///< Set sizing mode (default: Auto)
+    ButtonWidget& padding(float ratio);          ///< Padding ratio (0.0-0.5, default: 0.15 = 30% total)
 
     // State
     void setState(bool on);
@@ -59,10 +62,10 @@ public:
     void setText(const char* text);
 
 private:
-    // Sizing ratios (relative to min(parent_w, parent_h))
-    static constexpr float BUTTON_SIZE_RATIO = 0.6f;  // 60% of min parent dimension
-    static constexpr float RADIUS_RATIO = 0.15f;      // Corner radius relative to button size
-    static constexpr lv_coord_t MIN_SIZE = 20;        // Minimum button size
+    // Sizing constants
+    static constexpr float DEFAULT_PADDING_RATIO = 0.25f;  // 25% padding each side = 50% total, button = 50% of container
+    static constexpr float RADIUS_RATIO = 0.15f;           // Corner radius relative to button size
+    static constexpr lv_coord_t MIN_SIZE = 20;             // Minimum button size
 
     void createUI();
     void cleanup();
@@ -86,6 +89,10 @@ private:
     uint32_t on_color_ = 0;
     uint32_t text_off_color_ = 0;
     uint32_t text_on_color_ = 0;
+    float padding_ratio_ = DEFAULT_PADDING_RATIO;
+
+    // Size policy
+    SquareSizePolicy size_policy_;
 };
 
 }  // namespace oc::ui::lvgl

@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include <oc/ui/lvgl/IWidget.hpp>
+#include <oc/ui/lvgl/SquareSizePolicy.hpp>
 
 #include "../theme/BaseTheme.hpp"
 
@@ -60,6 +61,9 @@ public:
     KnobWidget& ribbonColor(uint32_t color);         ///< Ribbon arc color
     KnobWidget& ribbonOpacity(lv_opa_t opa);         ///< Ribbon opacity (default: LV_OPA_COVER)
     KnobWidget& ribbonThickness(float ratio);        ///< Thickness relative to main arc (0.0-1.0, default: 0.8)
+
+    // Size Policy
+    KnobWidget& sizeMode(SizeMode mode);             ///< Set sizing mode (default: Auto)
 
     // Data
     void setValue(float value);
@@ -126,11 +130,15 @@ private:
     bool centered_ = false;
     bool ribbon_enabled_ = false;
 
+    // Size policy
+    SquareSizePolicy size_policy_;
+
     // Cached geometry (computed from actual size) - all float for precision
     float knob_size_ = 0.0f;
     float arc_radius_ = 0.0f;
     float indicator_thickness_ = 0.0f;
-    float center_ = 0.0f;  // knob_size_ / 2
+    float center_x_ = 0.0f;  // container width / 2
+    float center_y_ = 0.0f;  // container height / 2
 };
 
 }  // namespace oc::ui::lvgl
