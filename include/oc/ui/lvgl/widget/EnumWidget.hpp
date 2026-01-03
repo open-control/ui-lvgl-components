@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include <oc/ui/lvgl/IWidget.hpp>
+#include <oc/ui/lvgl/SquareSizePolicy.hpp>
 
 #include "../theme/BaseTheme.hpp"
 
@@ -59,6 +60,9 @@ public:
     EnumWidget& flashColor(uint32_t color) &;
     EnumWidget flashColor(uint32_t color) &&;
 
+    /** @brief Set sizing mode (default: Auto) */
+    EnumWidget& sizeMode(SizeMode mode);
+
     // Actions
     /** @brief Trigger a flash animation on the indicator line */
     void triggerFlash();
@@ -74,7 +78,9 @@ private:
     void createUI();
     void cleanup();
     void applyColors();
+    void updateGeometry();
     static void flashTimerCallback(lv_timer_t* timer);
+    static void sizeChangedCallback(lv_event_t* e);
 
     // LVGL objects
     lv_obj_t* container_ = nullptr;
@@ -86,6 +92,9 @@ private:
     uint32_t bg_color_ = 0;
     uint32_t line_color_ = 0;
     uint32_t flash_color_ = 0;
+
+    // Size policy
+    SquareSizePolicy size_policy_;
 };
 
 }  // namespace oc::ui::lvgl

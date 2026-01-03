@@ -60,17 +60,17 @@ void ParameterKnob::createUI(lv_obj_t* parent) {
     lv_obj_set_grid_dsc_array(container_, col_dsc, row_dsc);
     lv_obj_set_layout(container_, LV_LAYOUT_GRID);
 
-    // Row 0: KnobWidget - centered horizontally, aligned to bottom (closer to label)
+    // Row 0: KnobWidget - stretch to fill cell
     knob_ = std::make_unique<KnobWidget>(container_);
     lv_obj_set_grid_cell(knob_->getElement(),
-        LV_GRID_ALIGN_CENTER, 0, 1,   // col: center, col 0, span 1
-        LV_GRID_ALIGN_END, 0, 1);     // row: end (bottom), closer to label
+        LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch to get width from grid
+        LV_GRID_ALIGN_STRETCH, 0, 1); // row: stretch to get height from grid
 
     // Row 1: Label - stretch width, content height
     label_ = std::make_unique<Label>(container_);
     lv_obj_set_grid_cell(label_->getElement(),
         LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch full width
-        LV_GRID_ALIGN_CENTER, 1, 1);  // row: center in row 1
+        LV_GRID_ALIGN_CENTER, 1, 1);  // row: center in CONTENT row
     label_->alignment(LV_TEXT_ALIGN_CENTER)
            .color(BaseTheme::Color::TEXT_PRIMARY)
            .autoScroll(true);

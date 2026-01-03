@@ -34,10 +34,12 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
       ribbon_value_(other.ribbon_value_),
       centered_(other.centered_),
       ribbon_enabled_(other.ribbon_enabled_),
+      size_policy_(other.size_policy_),
       knob_size_(other.knob_size_),
       arc_radius_(other.arc_radius_),
       indicator_thickness_(other.indicator_thickness_),
-      center_(other.center_) {
+      center_x_(other.center_x_),
+      center_y_(other.center_y_) {
     line_points_[0] = other.line_points_[0];
     line_points_[1] = other.line_points_[1];
     other.container_ = nullptr;
@@ -73,10 +75,12 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         ribbon_value_ = other.ribbon_value_;
         centered_ = other.centered_;
         ribbon_enabled_ = other.ribbon_enabled_;
+        size_policy_ = other.size_policy_;
         knob_size_ = other.knob_size_;
         arc_radius_ = other.arc_radius_;
         indicator_thickness_ = other.indicator_thickness_;
-        center_ = other.center_;
+        center_x_ = other.center_x_;
+        center_y_ = other.center_y_;
         other.container_ = nullptr;
         other.arc_ = nullptr;
         other.ribbon_arc_ = nullptr;
@@ -121,11 +125,8 @@ void KnobWidget::createUI() {
     applyColors();
     applyRibbonColors();
 
-    // Listen for parent size changes to recalculate geometry
-    lv_obj_t* parent = lv_obj_get_parent(container_);
-    if (parent) {
-        lv_obj_add_event_cb(parent, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
-    }
+    // Listen for own size changes to recalculate geometry
+    lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
 
     // Defer initial geometry calculation to next frame when layout is ready
     lv_timer_t* init_timer = lv_timer_create([](lv_timer_t* t) {
@@ -201,42 +202,29 @@ void KnobWidget::sizeChangedCallback(lv_event_t* e) {
 void KnobWidget::updateGeometry() {
     if (!container_) return;
 
-    lv_obj_t* parent = lv_obj_get_parent(container_);
-    if (!parent) return;
+    // Compute size using policy
+    auto result = size_policy_.compute(container_);
+    if (!result.valid) return;
 
-    // Force layout calculation on parent
-    lv_obj_update_layout(parent);
-
-    // Get parent content size (the ParameterKnob container)
-    float parent_w = static_cast<float>(lv_obj_get_content_width(parent));
-    float parent_h = static_cast<float>(lv_obj_get_content_height(parent));
-
-    // Skip if size not yet determined
-    if (parent_w <= 0.0f || parent_h <= 0.0f) return;
-
-    // Find sibling label to get its height (row 1 uses CONTENT height)
-    float label_h = 0.0f;
-    uint32_t child_count = lv_obj_get_child_count(parent);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(parent, i);
-        if (child != container_) {
-            label_h = static_cast<float>(lv_obj_get_height(child));
-            break;
-        }
+    // Apply container modifications if needed
+    if (result.modify_width) {
+        lv_obj_set_width(container_, result.width);
+    }
+    if (result.modify_height) {
+        lv_obj_set_height(container_, result.height);
     }
 
-    // Available space for knob = parent height - label height
-    float available_w = parent_w;
-    float available_h = parent_h - label_h;
+    // Calculate square size from result
+    float min_size = static_cast<float>(std::min(result.width, result.height));
+    if (min_size <= 0.0f) return;
 
-    // Use min(width, height) for square knob, enforce minimum
+    // Square knob, enforce minimum
     // Round down to even number for perfect centering (int division by 2)
-    float raw_size = std::max(static_cast<float>(MIN_SIZE), std::min(available_w, available_h));
+    float raw_size = std::max(static_cast<float>(MIN_SIZE), min_size);
     knob_size_ = static_cast<float>(static_cast<int>(raw_size) & ~1);  // Clear LSB = even
-    center_ = knob_size_ / 2.0f;
 
-    // Set container to square size (grid will position it)
-    lv_obj_set_size(container_, static_cast<lv_coord_t>(knob_size_), static_cast<lv_coord_t>(knob_size_));
+    center_x_ = knob_size_ / 2.0f;  // Knob center for indicator pivot
+    center_y_ = knob_size_ / 2.0f;
 
     // All sizes proportional to knob_size_
     // Force even sizes for perfect centering with lv_obj_center()
@@ -271,8 +259,8 @@ void KnobWidget::updateGeometry() {
     // Update indicator line
     if (indicator_) {
         lv_obj_set_style_line_width(indicator_, indicator_thickness, 0);
-        line_points_[0].x = center_;
-        line_points_[0].y = center_;
+        line_points_[0].x = center_x_;
+        line_points_[0].y = center_y_;
     }
 
     // Update center circles
@@ -372,6 +360,12 @@ KnobWidget& KnobWidget::ribbonThickness(float ratio) {
     return *this;
 }
 
+KnobWidget& KnobWidget::sizeMode(SizeMode mode) {
+    size_policy_.mode = mode;
+    updateGeometry();
+    return *this;
+}
+
 void KnobWidget::setValue(float value) {
     float clamped = std::clamp(value, 0.0f, 1.0f);
     if (std::abs(value_ - clamped) < 0.001f) return;
@@ -450,8 +444,8 @@ void KnobWidget::updateArc() {
 
 void KnobWidget::updateIndicatorLine(float angleRad) {
     // All calculations in float for precision
-    float end_x = center_ + arc_radius_ * std::cos(angleRad);
-    float end_y = center_ + arc_radius_ * std::sin(angleRad);
+    float end_x = center_x_ + arc_radius_ * std::cos(angleRad);
+    float end_y = center_y_ + arc_radius_ * std::sin(angleRad);
 
     // Update line endpoint (lv_point_precise_t uses float)
     line_points_[1].x = end_x;

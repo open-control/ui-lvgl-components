@@ -23,7 +23,9 @@ ButtonWidget::ButtonWidget(ButtonWidget&& other) noexcept
       off_color_(other.off_color_),
       on_color_(other.on_color_),
       text_off_color_(other.text_off_color_),
-      text_on_color_(other.text_on_color_) {
+      text_on_color_(other.text_on_color_),
+      padding_ratio_(other.padding_ratio_),
+      size_policy_(other.size_policy_) {
     other.container_ = nullptr;
     other.button_box_ = nullptr;
     other.state_label_ = nullptr;
@@ -42,6 +44,8 @@ ButtonWidget& ButtonWidget::operator=(ButtonWidget&& other) noexcept {
         on_color_ = other.on_color_;
         text_off_color_ = other.text_off_color_;
         text_on_color_ = other.text_on_color_;
+        padding_ratio_ = other.padding_ratio_;
+        size_policy_ = other.size_policy_;
 
         other.container_ = nullptr;
         other.button_box_ = nullptr;
@@ -80,11 +84,8 @@ void ButtonWidget::createUI() {
 
     applyState();
 
-    // Listen for parent size changes
-    lv_obj_t* parent = lv_obj_get_parent(container_);
-    if (parent) {
-        lv_obj_add_event_cb(parent, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
-    }
+    // Listen for own size changes
+    lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
 
     // Defer initial geometry calculation
     lv_timer_t* init_timer = lv_timer_create([](lv_timer_t* t) {
@@ -102,38 +103,29 @@ void ButtonWidget::sizeChangedCallback(lv_event_t* e) {
 }
 
 void ButtonWidget::updateGeometry() {
-    lv_obj_t* parent = lv_obj_get_parent(container_);
-    if (!parent) return;
+    if (!container_) return;
 
-    // Force parent layout update
-    lv_obj_update_layout(parent);
+    // Compute size using policy
+    auto result = size_policy_.compute(container_);
+    if (!result.valid) return;
 
-    // Get available space (account for sibling label if in ParameterButton)
-    lv_coord_t parent_w = lv_obj_get_width(parent);
-    lv_coord_t parent_h = lv_obj_get_height(parent);
-
-    // Find sibling label height (if in a component with label)
-    lv_coord_t label_h = 0;
-    uint32_t child_count = lv_obj_get_child_count(parent);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(parent, i);
-        if (child != container_) {
-            label_h = lv_obj_get_height(child);
-            break;
-        }
+    // Apply container modifications if needed
+    if (result.modify_width) {
+        lv_obj_set_width(container_, result.width);
+    }
+    if (result.modify_height) {
+        lv_obj_set_height(container_, result.height);
     }
 
-    // Available space for button
-    lv_coord_t available_h = parent_h - label_h;
-    lv_coord_t min_dim = std::min(parent_w, available_h);
+    // Calculate square size from result
+    lv_coord_t container_size = std::min(result.width, result.height);
+    if (container_size <= 0) return;
 
-    // Button size = 60% of min dimension, with minimum
-    button_size_ = std::max(MIN_SIZE, static_cast<lv_coord_t>(min_dim * BUTTON_SIZE_RATIO));
+    // Button size = container minus padding on each side
+    lv_coord_t padding = static_cast<lv_coord_t>(container_size * padding_ratio_);
+    button_size_ = std::max(MIN_SIZE, static_cast<lv_coord_t>(container_size - 2 * padding));
 
-    // Set container to button size (centered by grid)
-    lv_obj_set_size(container_, button_size_, button_size_);
-
-    // Button box fills container
+    // Button box centered in container
     lv_obj_set_size(button_box_, button_size_, button_size_);
     lv_obj_center(button_box_);
 
@@ -184,6 +176,18 @@ ButtonWidget& ButtonWidget::textOffColor(uint32_t color) {
 ButtonWidget& ButtonWidget::textOnColor(uint32_t color) {
     text_on_color_ = color;
     applyState();
+    return *this;
+}
+
+ButtonWidget& ButtonWidget::sizeMode(SizeMode mode) {
+    size_policy_.mode = mode;
+    updateGeometry();
+    return *this;
+}
+
+ButtonWidget& ButtonWidget::padding(float ratio) {
+    padding_ratio_ = std::clamp(ratio, 0.0f, 0.5f);
+    updateGeometry();
     return *this;
 }
 
