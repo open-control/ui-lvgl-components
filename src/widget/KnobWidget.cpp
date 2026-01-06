@@ -119,11 +119,10 @@ void KnobWidget::createUI() {
     lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
     createArc();
-    createRibbon();
+    // ribbon_arc created lazily in setRibbonValue()/setRibbonEnabled()
     createIndicator();
     createCenterCircles();
     applyColors();
-    applyRibbonColors();
 
     // Listen for own size changes to recalculate geometry
     lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
@@ -387,18 +386,28 @@ void KnobWidget::setVisible(bool visible) {
 void KnobWidget::setRibbonValue(float value) {
     float clamped = std::clamp(value, 0.0f, 1.0f);
     ribbon_value_ = clamped;
+    // Lazy-create ribbon arc on first use
+    if (!ribbon_arc_) {
+        createRibbon();
+        applyRibbonColors();
+        updateGeometry();  // Apply sizing to newly created arc
+    }
     // Auto-enable ribbon when value is set
     if (!ribbon_enabled_) {
         ribbon_enabled_ = true;
-        if (ribbon_arc_) {
-            lv_obj_clear_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
-        }
+        lv_obj_clear_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
     }
     updateRibbon();
 }
 
 void KnobWidget::setRibbonEnabled(bool enabled) {
     ribbon_enabled_ = enabled;
+    if (enabled && !ribbon_arc_) {
+        // Lazy-create ribbon arc
+        createRibbon();
+        applyRibbonColors();
+        updateGeometry();
+    }
     if (!ribbon_arc_) return;
     if (enabled) {
         lv_obj_clear_flag(ribbon_arc_, LV_OBJ_FLAG_HIDDEN);
@@ -451,7 +460,6 @@ void KnobWidget::updateIndicatorLine(float angleRad) {
     line_points_[1].x = end_x;
     line_points_[1].y = end_y;
     lv_obj_refresh_self_size(indicator_);
-    lv_obj_invalidate(indicator_);
 }
 
 float KnobWidget::normalizedToAngle(float normalized) const {
@@ -460,6 +468,11 @@ float KnobWidget::normalizedToAngle(float normalized) const {
 
 void KnobWidget::triggerFlash() {
     if (!inner_circle_) return;
+
+    // Rate-limit flash to avoid excessive timer creation during rapid encoder movement
+    uint32_t now = lv_tick_get();
+    if (now - last_flash_ms_ < FLASH_RATE_LIMIT_MS) return;
+    last_flash_ms_ = now;
 
     if (flash_timer_) {
         lv_timer_delete(flash_timer_);
