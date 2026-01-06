@@ -75,6 +75,7 @@ public:
 private:
     // Fixed proportions (relative to knob size)
     static constexpr uint16_t MIN_SIZE = 30;
+    static constexpr uint32_t FLASH_RATE_LIMIT_MS = 80;    // Min interval between flashes
     static constexpr float ARC_WIDTH_RATIO = 0.13f;        // Arc width as ratio of size
     static constexpr float INDICATOR_RATIO = 0.13f;        // Indicator thickness ratio
     static constexpr float CENTER_CIRCLE_RATIO = 0.22f;    // Center circle size ratio
@@ -129,6 +130,7 @@ private:
     float ribbon_value_ = 0.0f;
     bool centered_ = false;
     bool ribbon_enabled_ = false;
+    uint32_t last_flash_ms_ = 0;
 
     // Size policy
     SquareSizePolicy size_policy_;
