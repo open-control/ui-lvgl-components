@@ -98,7 +98,7 @@ public:
      * @param gap Gap between items (default: ROW_GAP_MD from BaseTheme)
      */
     StyleBuilder& flexRow(lv_flex_align_t hAlign = LV_FLEX_ALIGN_START,
-                          int16_t gap = BaseTheme::Layout::ROW_GAP_MD) {
+                          int16_t gap = base_theme::layout::ROW_GAP_MD) {
         lv_obj_set_flex_flow(obj_, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(obj_, hAlign, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_gap(obj_, gap, 0);
@@ -111,7 +111,7 @@ public:
      * @param gap Gap between items (default: ROW_GAP_MD from BaseTheme)
      */
     StyleBuilder& flexColumn(lv_flex_align_t vAlign = LV_FLEX_ALIGN_START,
-                             int16_t gap = BaseTheme::Layout::ROW_GAP_MD) {
+                             int16_t gap = base_theme::layout::ROW_GAP_MD) {
         lv_obj_set_flex_flow(obj_, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(obj_, LV_FLEX_ALIGN_CENTER, vAlign, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_gap(obj_, gap, 0);

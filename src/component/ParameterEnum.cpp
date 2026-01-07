@@ -71,7 +71,7 @@ void ParameterEnum::createUI(lv_obj_t* parent) {
     value_label_ = std::make_unique<Label>(enum_widget_->inner());
     lv_obj_set_size(value_label_->getElement(), LV_PCT(100), LV_SIZE_CONTENT);
     value_label_->alignment(LV_TEXT_ALIGN_CENTER)
-                 .color(BaseTheme::Color::TEXT_PRIMARY)
+                 .color(base_theme::color::TEXT_PRIMARY)
                  .autoScroll(true);
 
     // Row 1: Name label - stretch width, content height
@@ -80,7 +80,7 @@ void ParameterEnum::createUI(lv_obj_t* parent) {
         LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch full width
         LV_GRID_ALIGN_CENTER, 1, 1);  // row: center in row 1
     name_label_->alignment(LV_TEXT_ALIGN_CENTER)
-               .color(BaseTheme::Color::TEXT_PRIMARY)
+               .color(base_theme::color::TEXT_PRIMARY)
                .autoScroll(true);
 }
 

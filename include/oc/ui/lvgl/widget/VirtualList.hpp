@@ -144,19 +144,19 @@ public:
 
     /**
      * @brief Set padding around the list content
-     * @param pad Padding in pixels (default: BaseTheme::Layout::LIST_PAD)
+     * @param pad Padding in pixels (default: base_theme::layout::LIST_PAD)
      */
     VirtualList& padding(int16_t pad);
 
     /**
      * @brief Set gap between items
-     * @param gap Gap in pixels (default: BaseTheme::Layout::LIST_ITEM_GAP)
+     * @param gap Gap in pixels (default: base_theme::layout::LIST_ITEM_GAP)
      */
     VirtualList& itemGap(int16_t gap);
 
     /**
      * @brief Set horizontal margins
-     * @param margin Margin in pixels (default: BaseTheme::Layout::MARGIN_MD)
+     * @param margin Margin in pixels (default: base_theme::layout::MARGIN_MD)
      */
     VirtualList& marginH(int16_t margin);
 

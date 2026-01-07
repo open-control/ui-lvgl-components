@@ -184,7 +184,7 @@ void KnobWidget::createCenterCircles() {
     lv_obj_center(inner_circle_);
     lv_obj_set_style_radius(inner_circle_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(inner_circle_, 0, 0);
-    lv_obj_set_style_bg_color(inner_circle_, lv_color_hex(BaseTheme::Color::INACTIVE), 0);
+    lv_obj_set_style_bg_color(inner_circle_, lv_color_hex(base_theme::color::INACTIVE), 0);
     lv_obj_set_style_bg_opa(inner_circle_, LV_OPA_COVER, 0);
     lv_obj_set_scrollbar_mode(inner_circle_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(inner_circle_, LV_OBJ_FLAG_CLICKABLE);
@@ -278,9 +278,9 @@ void KnobWidget::updateGeometry() {
 }
 
 void KnobWidget::applyColors() {
-    uint32_t bg = bg_color_ != 0 ? bg_color_ : BaseTheme::Color::INACTIVE;
-    uint32_t track = track_color_ != 0 ? track_color_ : BaseTheme::Color::KNOB_TRACK;
-    uint32_t value_col = value_color_ != 0 ? value_color_ : BaseTheme::Color::KNOB_VALUE;
+    uint32_t bg = bg_color_ != 0 ? bg_color_ : base_theme::color::INACTIVE;
+    uint32_t track = track_color_ != 0 ? track_color_ : base_theme::color::KNOB_TRACK;
+    uint32_t value_col = value_color_ != 0 ? value_color_ : base_theme::color::KNOB_VALUE;
 
     if (arc_) {
         lv_obj_set_style_arc_color(arc_, lv_color_hex(bg), LV_PART_MAIN);
@@ -296,7 +296,7 @@ void KnobWidget::applyColors() {
 
 void KnobWidget::applyRibbonColors() {
     if (!ribbon_arc_) return;
-    uint32_t color = ribbon_color_ != 0 ? ribbon_color_ : BaseTheme::Color::MACRO_6_BLUE;
+    uint32_t color = ribbon_color_ != 0 ? ribbon_color_ : base_theme::color::MACRO_6_BLUE;
     lv_obj_set_style_arc_color(ribbon_arc_, lv_color_hex(color), LV_PART_INDICATOR);
     lv_obj_set_style_arc_opa(ribbon_arc_, ribbon_opa_, LV_PART_INDICATOR);
 }
@@ -479,10 +479,10 @@ void KnobWidget::triggerFlash() {
         flash_timer_ = nullptr;
     }
 
-    uint32_t flash = flash_color_ != 0 ? flash_color_ : BaseTheme::Color::ACTIVE;
+    uint32_t flash = flash_color_ != 0 ? flash_color_ : base_theme::color::ACTIVE;
     lv_obj_set_style_bg_color(inner_circle_, lv_color_hex(flash), 0);
 
-    flash_timer_ = lv_timer_create(flashTimerCallback, BaseTheme::Animation::FLASH_DURATION_MS, this);
+    flash_timer_ = lv_timer_create(flashTimerCallback, base_theme::animation::FLASH_DURATION_MS, this);
     lv_timer_set_repeat_count(flash_timer_, 1);
 }
 
@@ -490,7 +490,7 @@ void KnobWidget::flashTimerCallback(lv_timer_t* timer) {
     auto* widget = static_cast<KnobWidget*>(lv_timer_get_user_data(timer));
     if (!widget || !widget->inner_circle_) return;
 
-    uint32_t bg = widget->bg_color_ != 0 ? widget->bg_color_ : BaseTheme::Color::INACTIVE;
+    uint32_t bg = widget->bg_color_ != 0 ? widget->bg_color_ : base_theme::color::INACTIVE;
     lv_obj_set_style_bg_color(widget->inner_circle_, lv_color_hex(bg), 0);
     widget->flash_timer_ = nullptr;
 }
