@@ -10,9 +10,9 @@ namespace oc::ui::lvgl {
  * Provides default colors, layout values, and animation timing.
  * Widgets use these as defaults but allow override via fluent setters.
  */
-namespace BaseTheme {
+namespace base_theme {
 
-namespace Color {
+namespace color {
 
 // Macro colors (for parameter widgets, 8-color palette)
 constexpr uint32_t MACRO_1_RED = 0xF41B3E;
@@ -58,9 +58,9 @@ inline uint32_t getMacroColor(uint8_t index) {
     return (index < 8) ? MACROS[index] : INACTIVE;
 }
 
-}  // namespace Color
+}  // namespace color
 
-namespace Layout {
+namespace layout {
 
 // Spacing scale (base unit: 2px)
 constexpr int16_t SPACE_XS = 2;
@@ -88,12 +88,12 @@ constexpr int16_t SCROLLBAR_WIDTH = 3;
 constexpr int16_t ROW_GAP_SM = 2;
 constexpr int16_t ROW_GAP_MD = 4;
 
-}  // namespace Layout
+}  // namespace layout
 
 // =============================================================================
 // Opacity - Semantic opacity levels
 // =============================================================================
-namespace Opacity {
+namespace opacity {
 
 constexpr uint8_t OPA_FULL = 255;      // LV_OPA_COVER - fully visible
 constexpr uint8_t OPA_90 = 230;        // ~90% - modal backgrounds, overlays
@@ -102,12 +102,12 @@ constexpr uint8_t OPA_50 = 127;        // ~50% - disabled, dimmed
 constexpr uint8_t OPA_30 = 77;         // ~30% - scrollbars, subtle hints
 constexpr uint8_t OPA_TRANSP = 0;      // LV_OPA_TRANSP - invisible
 
-}  // namespace Opacity
+}  // namespace opacity
 
 // =============================================================================
 // Animation - Timing constants
 // =============================================================================
-namespace Animation {
+namespace animation {
 
 // Standard duration scale
 constexpr uint32_t INSTANT_MS = 0;
@@ -121,8 +121,8 @@ constexpr uint32_t SCROLL_START_DELAY_MS = 500;
 constexpr uint32_t OVERFLOW_CHECK_DELAY_MS = 50;
 constexpr uint32_t FLASH_DURATION_MS = FAST_MS;
 
-}  // namespace Animation
+}  // namespace animation
 
-}  // namespace BaseTheme
+}  // namespace base_theme
 
 }  // namespace oc::ui::lvgl

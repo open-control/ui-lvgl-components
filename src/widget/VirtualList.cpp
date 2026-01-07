@@ -12,9 +12,9 @@ namespace oc::ui::lvgl::widget {
 
 VirtualList::VirtualList(lv_obj_t* parent) : parent_(parent) {
     // Use theme defaults
-    padding_ = BaseTheme::Layout::LIST_PAD;
-    itemGap_ = BaseTheme::Layout::LIST_ITEM_GAP;
-    marginH_ = BaseTheme::Layout::MARGIN_MD;
+    padding_ = base_theme::layout::LIST_PAD;
+    itemGap_ = base_theme::layout::LIST_ITEM_GAP;
+    marginH_ = base_theme::layout::MARGIN_MD;
 
     createContainer();
 }
@@ -356,11 +356,11 @@ void VirtualList::createSlots() {
         lv_obj_set_style_bg_opa(slot.container, LV_OPA_TRANSP, LV_STATE_DEFAULT);
         lv_obj_set_style_border_width(slot.container, 0, LV_STATE_DEFAULT);
 
-        lv_obj_set_style_pad_left(slot.container, BaseTheme::Layout::PAD_BUTTON_H, LV_STATE_DEFAULT);
-        lv_obj_set_style_pad_right(slot.container, BaseTheme::Layout::MARGIN_LG, LV_STATE_DEFAULT);
-        lv_obj_set_style_pad_top(slot.container, BaseTheme::Layout::PAD_BUTTON_V, LV_STATE_DEFAULT);
-        lv_obj_set_style_pad_bottom(slot.container, BaseTheme::Layout::PAD_BUTTON_V, LV_STATE_DEFAULT);
-        lv_obj_set_style_pad_column(slot.container, BaseTheme::Layout::MARGIN_MD, LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_left(slot.container, base_theme::layout::PAD_BUTTON_H, LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_right(slot.container, base_theme::layout::MARGIN_LG, LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_top(slot.container, base_theme::layout::PAD_BUTTON_V, LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_bottom(slot.container, base_theme::layout::PAD_BUTTON_V, LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_column(slot.container, base_theme::layout::MARGIN_MD, LV_STATE_DEFAULT);
 
         lv_obj_set_flex_flow(slot.container, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(slot.container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);

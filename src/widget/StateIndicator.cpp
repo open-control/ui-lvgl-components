@@ -57,9 +57,9 @@ void StateIndicator::applyState() {
 
     // Default colors per state
     static constexpr uint32_t DEFAULT_COLORS[] = {
-        BaseTheme::Color::INACTIVE,        // OFF
-        BaseTheme::Color::STATUS_WARNING,  // ACTIVE
-        BaseTheme::Color::STATUS_SUCCESS   // PRESSED
+        base_theme::color::INACTIVE,        // OFF
+        base_theme::color::STATUS_WARNING,  // ACTIVE
+        base_theme::color::STATUS_SUCCESS   // PRESSED
     };
 
     // Default opacities per state

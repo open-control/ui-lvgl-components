@@ -301,7 +301,7 @@ void Label::startScrollAnimation() {
     lv_anim_set_exec_cb(&scroll_anim_, scrollAnimCallback);
     lv_anim_set_values(&scroll_anim_, 0, -overflow_amount_);
     lv_anim_set_duration(&scroll_anim_, scroll_duration_ms_);
-    lv_anim_set_delay(&scroll_anim_, BaseTheme::Animation::SCROLL_START_DELAY_MS);
+    lv_anim_set_delay(&scroll_anim_, base_theme::animation::SCROLL_START_DELAY_MS);
     lv_anim_set_path_cb(&scroll_anim_, lv_anim_path_ease_in_out);
     lv_anim_set_completed_cb(&scroll_anim_, [](lv_anim_t* a) {
         auto* self = static_cast<Label*>(a->var);

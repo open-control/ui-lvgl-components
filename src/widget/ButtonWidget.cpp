@@ -135,10 +135,10 @@ void ButtonWidget::updateGeometry() {
 }
 
 void ButtonWidget::applyState() {
-    uint32_t bg_default_off = BaseTheme::Color::INACTIVE;
-    uint32_t bg_default_on = BaseTheme::Color::ACTIVE;
-    uint32_t text_default_off = BaseTheme::Color::TEXT_PRIMARY;
-    uint32_t text_default_on = BaseTheme::Color::TEXT_PRIMARY_INVERTED;
+    uint32_t bg_default_off = base_theme::color::INACTIVE;
+    uint32_t bg_default_on = base_theme::color::ACTIVE;
+    uint32_t text_default_off = base_theme::color::TEXT_PRIMARY;
+    uint32_t text_default_on = base_theme::color::TEXT_PRIMARY_INVERTED;
 
     uint32_t bg = is_on_ ? (on_color_ != 0 ? on_color_ : bg_default_on)
                          : (off_color_ != 0 ? off_color_ : bg_default_off);

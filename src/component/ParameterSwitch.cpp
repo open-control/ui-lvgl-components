@@ -71,7 +71,7 @@ void ParameterSwitch::createUI(lv_obj_t* parent) {
         LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch full width
         LV_GRID_ALIGN_CENTER, 1, 1);  // row: center in row 1
     label_->alignment(LV_TEXT_ALIGN_CENTER)
-           .color(BaseTheme::Color::TEXT_PRIMARY)
+           .color(base_theme::color::TEXT_PRIMARY)
            .autoScroll(true);
 }
 

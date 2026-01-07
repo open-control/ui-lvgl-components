@@ -106,8 +106,8 @@ void EnumWidget::createUI() {
 }
 
 void EnumWidget::applyColors() {
-    uint32_t bg = bg_color_ != 0 ? bg_color_ : BaseTheme::Color::BACKGROUND;
-    uint32_t line = line_color_ != 0 ? line_color_ : BaseTheme::Color::INACTIVE;
+    uint32_t bg = bg_color_ != 0 ? bg_color_ : base_theme::color::BACKGROUND;
+    uint32_t line = line_color_ != 0 ? line_color_ : base_theme::color::INACTIVE;
 
     if (container_) {
         lv_obj_set_style_bg_color(container_, lv_color_hex(bg), 0);
@@ -205,10 +205,10 @@ void EnumWidget::triggerFlash() {
         flash_timer_ = nullptr;
     }
 
-    uint32_t flash = flash_color_ != 0 ? flash_color_ : BaseTheme::Color::ACTIVE;
+    uint32_t flash = flash_color_ != 0 ? flash_color_ : base_theme::color::ACTIVE;
     lv_obj_set_style_bg_color(top_line_, lv_color_hex(flash), 0);
 
-    flash_timer_ = lv_timer_create(flashTimerCallback, BaseTheme::Animation::FLASH_DURATION_MS, this);
+    flash_timer_ = lv_timer_create(flashTimerCallback, base_theme::animation::FLASH_DURATION_MS, this);
     lv_timer_set_repeat_count(flash_timer_, 1);
 }
 
@@ -216,7 +216,7 @@ void EnumWidget::flashTimerCallback(lv_timer_t* timer) {
     auto* widget = static_cast<EnumWidget*>(lv_timer_get_user_data(timer));
     if (!widget || !widget->top_line_) return;
 
-    uint32_t line = widget->line_color_ != 0 ? widget->line_color_ : BaseTheme::Color::INACTIVE;
+    uint32_t line = widget->line_color_ != 0 ? widget->line_color_ : base_theme::color::INACTIVE;
     lv_obj_set_style_bg_color(widget->top_line_, lv_color_hex(line), 0);
     widget->flash_timer_ = nullptr;
 }
