@@ -54,17 +54,19 @@ void ParameterKnob::createUI(lv_obj_t* parent) {
     lv_obj_add_flag(container_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
     lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
-    // Grid: 1 column (100%), 2 rows (FR(1) for knob, CONTENT for label)
+    // Grid: 1 column (100%), 2 rows (CONTENT for knob, CONTENT for label)
+    // KnobWidget uses SquareSizePolicy to set height = width automatically
     static int32_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    static int32_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_CONTENT, LV_GRID_TEMPLATE_LAST};
+    static int32_t row_dsc[] = {LV_GRID_CONTENT, LV_GRID_CONTENT, LV_GRID_TEMPLATE_LAST};
     lv_obj_set_grid_dsc_array(container_, col_dsc, row_dsc);
     lv_obj_set_layout(container_, LV_LAYOUT_GRID);
 
-    // Row 0: KnobWidget - stretch to fill cell
+    // Row 0: KnobWidget - stretch horizontally, CONTENT row sizes to knob height
     knob_ = std::make_unique<KnobWidget>(container_);
+    knob_->sizeMode(SizeMode::SquareFromWidth);  // Height = Width
     lv_obj_set_grid_cell(knob_->getElement(),
         LV_GRID_ALIGN_STRETCH, 0, 1,  // col: stretch to get width from grid
-        LV_GRID_ALIGN_STRETCH, 0, 1); // row: stretch to get height from grid
+        LV_GRID_ALIGN_START, 0, 1);   // row: start in CONTENT row
 
     // Row 1: Label - stretch width, content height
     label_ = std::make_unique<Label>(container_);

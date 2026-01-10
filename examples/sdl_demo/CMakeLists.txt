@@ -107,6 +107,27 @@ FetchContent_GetProperties(SDL2 SOURCE_DIR SDL2_SOURCE_DIR)
 set(SDL2_INCLUDE_DIR "${SDL2_SOURCE_DIR}/include")
 
 # ==============================================================================
+# SDL2_gfx (graphics primitives: circles, arcs, etc.)
+# ==============================================================================
+message(STATUS "Fetching SDL2_gfx...")
+FetchContent_Declare(
+    SDL2_gfx
+    GIT_REPOSITORY https://github.com/ferzkopp/SDL2_gfx.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+    GIT_PROGRESS   TRUE
+)
+FetchContent_MakeAvailable(SDL2_gfx)
+FetchContent_GetProperties(SDL2_gfx SOURCE_DIR SDL2_GFX_SOURCE_DIR)
+
+# SDL2_gfx sources (only what we need)
+set(SDL2_GFX_SOURCES
+    ${SDL2_GFX_SOURCE_DIR}/SDL2_gfxPrimitives.c
+    ${SDL2_GFX_SOURCE_DIR}/SDL2_rotozoom.c
+)
+set(SDL2_GFX_INCLUDE_DIR "${SDL2_GFX_SOURCE_DIR}")
+
+# ==============================================================================
 # LVGL (from PlatformIO)
 # ==============================================================================
 set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
@@ -135,7 +156,9 @@ set(MAIN_SOURCES
     src/main.cpp
     src/hal/hal.c
     src/mouse_cursor_icon.c
+    src/hw_simulator/HwSimulator.cpp
     ${UI_LVGL_COMPONENTS_SOURCES}
+    ${SDL2_GFX_SOURCES}
 )
 
 add_executable(demo ${MAIN_SOURCES})
@@ -146,6 +169,7 @@ target_include_directories(demo PRIVATE
     ${UI_LVGL_COMPONENTS_DIR}/include
     ${UI_LVGL_DIR}/src
     ${SDL2_INCLUDE_DIR}
+    ${SDL2_GFX_INCLUDE_DIR}
 )
 
 target_link_libraries(demo PRIVATE
