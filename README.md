@@ -104,9 +104,34 @@ cd ui-lvgl-components
 |--------|-------------|
 | `./build_demo.sh` | Build SDL demo (auto-downloads tools if needed) |
 | `./run_demo.sh` | Run the demo (builds if needed) |
+| `./watch_demo.sh` | **Hot reload** - Watch files, rebuild & restart on changes |
 | `./clean_env.sh` | Clean everything (tools + build) |
 | `./clean_env.sh --build-only` | Clean build artifacts only |
 | `./init_env.sh` | Initialize environment manually |
+
+### Hot Reload Development
+
+For faster iteration, use `watch_demo.sh`:
+
+```bash
+./watch_demo.sh
+```
+
+This will:
+1. Build and launch the demo
+2. Watch `src/`, `include/`, and `examples/sdl_demo/src/` for changes
+3. Automatically rebuild and restart when files change
+
+**For best performance**, install [watchexec](https://github.com/watchexec/watchexec):
+```bash
+# Windows
+winget install watchexec
+
+# Or via Cargo (cross-platform)
+cargo install watchexec-cli
+```
+
+Without watchexec, the script falls back to polling (slightly slower but works everywhere).
 
 ## Build System
 

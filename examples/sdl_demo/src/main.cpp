@@ -3,6 +3,8 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include "hal/hal.h"
+#include "hw_simulator/HwSimulator.hpp"
+#include "SDL2_gfxPrimitives.h"
 
 #ifdef _WIN32
 #include <dwmapi.h>
@@ -34,8 +36,16 @@ static void enable_dark_title_bar(SDL_Window* window) {
 }
 #endif
 
-static constexpr int WINDOW_W = 600;
-static constexpr int WINDOW_H = 160;
+// Hardware simulator (full panel)
+static constexpr int PANEL_SIZE = HwLayout::PANEL_SIZE;  // 1013px (correct proportions)
+
+// LVGL screen size (embedded display)
+static constexpr int SCREEN_W = HwLayout::SCREEN_W;  // 320px
+static constexpr int SCREEN_H = HwLayout::SCREEN_H;  // 240px
+
+// Hardware simulator instance
+static HwSimulator hwSim;
+
 
 // ============================================================================
 // Component storage
@@ -132,6 +142,28 @@ static void setup_knob_interaction(KnobWidget& knob) {
 
 static void create_demo_ui(void);
 
+// Hardware event handlers
+static void on_hw_button(int id, bool pressed) {
+    printf("Button %d %s\n", id, pressed ? "pressed" : "released");
+
+    // Example: Link hardware button to LVGL actions
+    if (id == HwId::BOTTOM_CENTER && pressed && bypass_param) {
+        bool new_state = !bypass_param->button().getState();
+        bypass_param->button().setState(new_state);
+        bypass_param->button().setText(new_state ? "ON" : "OFF");
+    }
+}
+
+static void on_hw_encoder(int id, float value) {
+    printf("Encoder %d value: %.3f\n", id, value);
+
+    // Link macro encoders to LVGL knobs
+    int macroIndex = id - HwId::MACRO_ENC_1;
+    if (macroIndex >= 0 && macroIndex < 4 && knob_params[macroIndex]) {
+        knob_params[macroIndex]->knob().setValue(value);
+    }
+}
+
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
 
@@ -139,187 +171,282 @@ int main(int argc, char **argv) {
 #ifdef _WIN32
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
 #elif defined(__linux__)
-    // Linux/Wayland: request window decorations
-    // Option 1: Use libdecor for client-side decorations (requires libdecor at runtime)
     SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_PREFER_LIBDECOR, "1");
-    // Option 2: Allow compositor to handle decorations (server-side)
     SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_ALLOW_LIBDECOR, "1");
 #endif
 
     lv_init();
-    lv_display_t* disp = sdl_hal_init(WINDOW_W, WINDOW_H);
-    lv_sdl_window_set_resizeable(disp, true);
-    lv_sdl_window_set_title(disp, "UI Components Demo");
+
+    // Create LVGL display at PANEL size (square - no legend, indicator is inside panel)
+    lv_display_t* disp = sdl_hal_init(PANEL_SIZE, PANEL_SIZE);
+    lv_sdl_window_set_title(disp, "Hardware Simulator");
+
+    // Get SDL window and renderer from LVGL
+    SDL_Window* window = lv_sdl_window_get_window(disp);
+    SDL_Renderer* renderer = static_cast<SDL_Renderer*>(lv_sdl_window_get_renderer(disp));
+    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
 #ifdef _WIN32
-    enable_dark_title_bar(lv_sdl_window_get_window(disp));
+    enable_dark_title_bar(window);
 #endif
 
+    // Initialize hardware simulator
+    hwSim.init(renderer);
+    hwSim.setButtonCallback(on_hw_button);
+    hwSim.setEncoderCallback(on_hw_encoder);
+
+    // Create LVGL UI
     create_demo_ui();
 
+    // Get screen rect for LVGL positioning
+    SDL_Rect screenRect = hwSim.getScreenRect();
+
+    // Create render target texture for LVGL compositing
+    // This allows us to capture LVGL's rendering and composite it with hwSim
+    SDL_Texture* lvglTexture = SDL_CreateTexture(
+        renderer,
+        SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET,
+        PANEL_SIZE, PANEL_SIZE
+    );
+    SDL_SetTextureBlendMode(lvglTexture, SDL_BLENDMODE_BLEND);
+
+    // Main loop
     while(1) {
+        // Handle SDL events (for hardware simulation)
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                SDL_DestroyTexture(lvglTexture);
+                return 0;
+            }
+
+            // Adjust mouse coordinates for LVGL (offset by screen position)
+            if (event.type == SDL_MOUSEBUTTONDOWN ||
+                event.type == SDL_MOUSEBUTTONUP ||
+                event.type == SDL_MOUSEMOTION) {
+                // Check if inside LVGL screen area
+                int mx = (event.type == SDL_MOUSEMOTION) ? event.motion.x : event.button.x;
+                int my = (event.type == SDL_MOUSEMOTION) ? event.motion.y : event.button.y;
+
+                if (mx >= screenRect.x && mx < screenRect.x + screenRect.w &&
+                    my >= screenRect.y && my < screenRect.y + screenRect.h) {
+                    // Inside LVGL area - let LVGL handle it (coordinates will be wrong though)
+                    // For now, hardware sim won't capture these events
+                } else {
+                    // Outside LVGL area - hardware simulator handles it
+                    hwSim.handleEvent(event);
+                }
+            } else if (event.type == SDL_MOUSEWHEEL) {
+                // Check mouse position for wheel events
+                int mx, my;
+                SDL_GetMouseState(&mx, &my);
+                if (!(mx >= screenRect.x && mx < screenRect.x + screenRect.w &&
+                      my >= screenRect.y && my < screenRect.y + screenRect.h)) {
+                    hwSim.handleEvent(event);
+                }
+            }
+        }
+
+        // Redirect LVGL rendering to our texture
+        // This way LVGL's internal SDL_RenderPresent won't show an incomplete frame
+        SDL_SetRenderTarget(renderer, lvglTexture);
+
+        // LVGL timer handler renders to our texture
+        // Its internal SDL_RenderPresent will present the previous frame (unchanged)
         uint32_t time_till_next = lv_timer_handler();
-        uint32_t delay = (time_till_next == LV_NO_TIMER_READY) ? 5 : LV_MIN(time_till_next, 5);
-        SDL_Delay(delay);
+        (void)time_till_next;
+
+        // Switch back to rendering to window
+        SDL_SetRenderTarget(renderer, NULL);
+
+        // Clear and draw hwSim first (background)
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        hwSim.render();
+
+        // Composite ONLY the LVGL screen area on top (not the full texture which has black background)
+        // This preserves hwSim in the areas outside the LVGL screen
+        SDL_Rect lvglScreenRect = {
+            HwLayout::SCREEN_X, HwLayout::SCREEN_Y,
+            HwLayout::SCREEN_W, HwLayout::SCREEN_H
+        };
+        SDL_RenderCopy(renderer, lvglTexture, &lvglScreenRect, &lvglScreenRect);
+
+        // Single present with everything composited
+        SDL_RenderPresent(renderer);
+
+        // Small delay
+        SDL_Delay(1);
     }
     return 0;
 }
 
 static void create_demo_ui(void) {
+    // Layout constants (match production)
+    constexpr lv_coord_t TOP_BAR_HEIGHT = 20;
+    constexpr lv_coord_t TRANSPORT_BAR_HEIGHT = 20;
+    constexpr int GRID_COLS = 4;
+    constexpr int GRID_ROWS = 2;
+
     lv_obj_t* scr = lv_screen_active();
-    lv_obj_set_style_bg_color(scr, lv_color_hex(BaseTheme::Color::BACKGROUND), 0);
+    // Make screen transparent so hardware sim shows through
+    lv_obj_set_style_bg_opa(scr, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(scr, 0, 0);
 
-    // Grid: 7 flexible columns, 1 flexible row (adapts to window size)
-    static int32_t col_dsc[] = {
-        LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
-        LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
-        LV_GRID_TEMPLATE_LAST
+    // ========================================================================
+    // Screen container - positioned at the "display" area of the hardware
+    // ========================================================================
+    lv_obj_t* screen_container = lv_obj_create(scr);
+    lv_obj_set_pos(screen_container, HwLayout::SCREEN_X, HwLayout::SCREEN_Y);
+    lv_obj_set_size(screen_container, HwLayout::SCREEN_W, HwLayout::SCREEN_H);
+    lv_obj_set_style_bg_color(screen_container, lv_color_hex(base_theme::color::BACKGROUND), 0);
+    lv_obj_set_style_border_width(screen_container, 0, 0);
+    lv_obj_set_style_pad_all(screen_container, 0, 0);
+    lv_obj_set_style_radius(screen_container, 0, 0);
+    lv_obj_set_scrollbar_mode(screen_container, LV_SCROLLBAR_MODE_OFF);
+
+    // Main layout inside screen container (flex column)
+    lv_obj_set_layout(screen_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(screen_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(screen_container, 0, 0);
+
+    // ========================================================================
+    // TopBar (20px height)
+    // ========================================================================
+    lv_obj_t* top_bar = lv_obj_create(screen_container);
+    lv_obj_set_size(top_bar, LV_PCT(100), TOP_BAR_HEIGHT);
+    lv_obj_set_style_bg_color(top_bar, lv_color_hex(base_theme::color::BACKGROUND), 0);
+    lv_obj_set_style_border_width(top_bar, 0, 0);
+    lv_obj_set_style_pad_all(top_bar, 0, 0);
+    lv_obj_set_scrollbar_mode(top_bar, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t* title_label = lv_label_create(top_bar);
+    lv_label_set_text(title_label, "UI Components Demo");
+    lv_obj_set_style_text_color(title_label, lv_color_hex(base_theme::color::TEXT_SECONDARY), 0);
+    lv_obj_center(title_label);
+
+    // ========================================================================
+    // Body container (takes remaining space, grid 4x2)
+    // ========================================================================
+    lv_obj_t* body = lv_obj_create(screen_container);
+    lv_obj_set_size(body, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow(body, 1);
+    lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(body, 0, 0);
+    lv_obj_set_style_pad_all(body, 0, 0);
+    lv_obj_set_scrollbar_mode(body, LV_SCROLLBAR_MODE_OFF);
+
+    // Grid layout: 4 columns, 2 rows
+    static int32_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static int32_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(body, col_dsc, row_dsc);
+    lv_obj_set_layout(body, LV_LAYOUT_GRID);
+    lv_obj_set_style_pad_column(body, 0, 0);
+    lv_obj_set_style_pad_row(body, 0, 0);
+
+    // ========================================================================
+    // 8 ParameterKnob components in 4x2 grid
+    // ========================================================================
+    const char* knob_names[8] = {
+        "Macro 1", "Macro 2", "Macro 3", "Macro 4",
+        "Macro 5", "Macro 6", "Macro 7", "Macro 8"
     };
-    static int32_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    bool knob_centered[8] = {false, false, false, false, true, false, false, false};  // Macro 5 centered
 
-    lv_obj_set_grid_dsc_array(scr, col_dsc, row_dsc);
-    lv_obj_set_layout(scr, LV_LAYOUT_GRID);
-    lv_obj_set_style_pad_all(scr, 16, 0);
-    lv_obj_set_style_pad_column(scr, 8, 0);
-    lv_obj_set_grid_align(scr, LV_GRID_ALIGN_SPACE_EVENLY, LV_GRID_ALIGN_CENTER);
+    for (int i = 0; i < 4; i++) {
+        int col = i % GRID_COLS;
+        int row = i / GRID_COLS;
 
-    // ========================================================================
-    // ParameterKnob components
-    // ========================================================================
+        knob_params[i] = new ParameterKnob(body);
+        knob_params[i]->knob()
+            .trackColor(base_theme::color::getMacroColor(i))
+            .flashColor(base_theme::color::ACTIVE);
+        if (knob_centered[i]) {
+            knob_params[i]->knob().centered(true);
+        }
+        knob_params[i]->knob().setValue(0.5f);
+        knob_params[i]->label().alignment(LV_TEXT_ALIGN_CENTER);
+        knob_params[i]->label().setText(knob_names[i]);
+        setup_knob_interaction(knob_params[i]->knob());
 
-    // Knob 0 - Cutoff
-    knob_params[0] = new ParameterKnob(scr);
-    knob_params[0]->knob()
-        .trackColor(BaseTheme::Color::getMacroColor(0))
-        .flashColor(BaseTheme::Color::ACTIVE);
-    knob_params[0]->knob().setValue(0.5f);
-    knob_params[0]->label()
-        .alignment(LV_TEXT_ALIGN_CENTER)
-        .autoScroll(true);
-    knob_params[0]->label().setText("Cutoff Frequency");  // Long - will autoscroll
-    setup_knob_interaction(knob_params[0]->knob());
-    lv_obj_set_grid_cell(knob_params[0]->getElement(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+        lv_obj_set_grid_cell(knob_params[i]->getElement(),
+            LV_GRID_ALIGN_STRETCH, col, 1,
+            LV_GRID_ALIGN_STRETCH, row, 1);
+    }
 
-    // Knob 1 - Pan (centered)
-    knob_params[1] = new ParameterKnob(scr);
-    knob_params[1]->knob()
-        .trackColor(BaseTheme::Color::getMacroColor(5))
-        .flashColor(BaseTheme::Color::ACTIVE)
-        .centered(true);
-    knob_params[1]->knob().setValue(0.5f);
-    knob_params[1]->label()
-        .alignment(LV_TEXT_ALIGN_CENTER);
-    knob_params[1]->label().setText("Pan");
-    setup_knob_interaction(knob_params[1]->knob());
-    lv_obj_set_grid_cell(knob_params[1]->getElement(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-
-    // Knob 2 - Resonance
-    knob_params[2] = new ParameterKnob(scr);
-    knob_params[2]->knob()
-        .trackColor(BaseTheme::Color::getMacroColor(2))
-        .flashColor(BaseTheme::Color::ACTIVE);
-    knob_params[2]->knob().setValue(0.5f);
-    knob_params[2]->label()
-        .alignment(LV_TEXT_ALIGN_CENTER);
-    knob_params[2]->label().setText("Reso");
-    setup_knob_interaction(knob_params[2]->knob());
-    lv_obj_set_grid_cell(knob_params[2]->getElement(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-
-    // Knob 3 - Attack
-    knob_params[3] = new ParameterKnob(scr);
-    knob_params[3]->knob()
-        .trackColor(BaseTheme::Color::getMacroColor(3))
-        .flashColor(BaseTheme::Color::ACTIVE);
-    knob_params[3]->knob().setValue(0.5f);
-    knob_params[3]->label()
-        .alignment(LV_TEXT_ALIGN_CENTER);
-    knob_params[3]->label().setText("Attack");
-    setup_knob_interaction(knob_params[3]->knob());
-    lv_obj_set_grid_cell(knob_params[3]->getElement(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-
-    // ========================================================================
-    // ParameterEnum component (Wave selector)
-    // ========================================================================
-    wave_param = new ParameterEnum(scr);
+    // Row 2: ParameterEnum, ParameterSwitch, and 2 more knobs
+    // Slot 4 - Wave selector (ParameterEnum)
+    wave_param = new ParameterEnum(body);
     wave_param->enumWidget()
-        .lineColor(BaseTheme::Color::getMacroColor(4))
-        .flashColor(BaseTheme::Color::ACTIVE);
-    wave_param->valueLabel()
-        .alignment(LV_TEXT_ALIGN_CENTER)
-        .autoScroll(true);
+        .lineColor(base_theme::color::getMacroColor(4))
+        .flashColor(base_theme::color::ACTIVE);
+    wave_param->valueLabel().alignment(LV_TEXT_ALIGN_CENTER).autoScroll(true);
     wave_param->valueLabel().setText(wave_values[wave_index]);
-    wave_param->nameLabel()
-        .alignment(LV_TEXT_ALIGN_CENTER);
+    wave_param->nameLabel().alignment(LV_TEXT_ALIGN_CENTER);
     wave_param->nameLabel().setText("Wave");
-
-    // Click on the whole component container
     lv_obj_add_flag(wave_param->getElement(), LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(wave_param->getElement(), list_click_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_set_grid_cell(wave_param->getElement(), LV_GRID_ALIGN_STRETCH, 4, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+    lv_obj_set_grid_cell(wave_param->getElement(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
-    // ========================================================================
-    // ParameterSwitch component (Bypass)
-    // ========================================================================
-    bypass_param = new ParameterSwitch(scr);
+    // Slot 5 - Bypass (ParameterSwitch)
+    bypass_param = new ParameterSwitch(body);
     bypass_param->button()
-        .offColor(BaseTheme::Color::INACTIVE)
-        .onColor(BaseTheme::Color::getMacroColor(1))
-        .textOffColor(BaseTheme::Color::TEXT_PRIMARY)
-        .textOnColor(BaseTheme::Color::TEXT_PRIMARY_INVERTED);
+        .offColor(base_theme::color::INACTIVE)
+        .onColor(base_theme::color::getMacroColor(5))
+        .textOffColor(base_theme::color::TEXT_PRIMARY)
+        .textOnColor(base_theme::color::TEXT_PRIMARY_INVERTED);
     bypass_param->button().setText("OFF");
-    bypass_param->label()
-        .alignment(LV_TEXT_ALIGN_CENTER);
+    bypass_param->label().alignment(LV_TEXT_ALIGN_CENTER);
     bypass_param->label().setText("Bypass");
-
     lv_obj_t* btn_inner = bypass_param->button().inner();
     lv_obj_add_flag(btn_inner, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(btn_inner, button_click_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_set_grid_cell(bypass_param->getElement(), LV_GRID_ALIGN_STRETCH, 5, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+    lv_obj_set_grid_cell(bypass_param->getElement(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
-    // ========================================================================
-    // Indicators container (no component - standalone widgets)
-    // ========================================================================
-    lv_obj_t* ind_container = lv_obj_create(scr);
-    lv_obj_set_size(ind_container, lv_pct(100), lv_pct(100));  // Fill grid cell
+    // Slot 6 & 7 - Indicators column
+    lv_obj_t* ind_container = lv_obj_create(body);
     lv_obj_set_style_bg_opa(ind_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ind_container, 0, 0);
     lv_obj_set_style_pad_all(ind_container, 0, 0);
     lv_obj_set_layout(ind_container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(ind_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(ind_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(ind_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(ind_container, 6, 0);
-    lv_obj_set_style_pad_top(ind_container, 10, 0);
     lv_obj_set_scrollbar_mode(ind_container, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_grid_cell(ind_container, LV_GRID_ALIGN_STRETCH, 6, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+    lv_obj_set_grid_cell(ind_container, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
-    // Indicator 0 - linked to Knob 0
-    indicators[0] = new StateIndicator(ind_container, 12);
-    indicators[0]->color(StateIndicator::State::OFF, BaseTheme::Color::getMacroColor(0))
-                 .color(StateIndicator::State::ACTIVE, BaseTheme::Color::getMacroColor(0))
-                 .opacity(StateIndicator::State::OFF, LV_OPA_40)
-                 .opacity(StateIndicator::State::ACTIVE, LV_OPA_COVER);
-    indicators[0]->setState(StateIndicator::State::ACTIVE);
+    for (int i = 0; i < 3; i++) {
+        indicators[i] = new StateIndicator(ind_container, 12);
+        indicators[i]->color(StateIndicator::State::OFF, base_theme::color::getMacroColor(i * 2))
+                     .color(StateIndicator::State::ACTIVE, base_theme::color::getMacroColor(i * 2))
+                     .opacity(StateIndicator::State::OFF, LV_OPA_40)
+                     .opacity(StateIndicator::State::ACTIVE, LV_OPA_COVER);
+        indicators[i]->setState(i < 2 ? StateIndicator::State::ACTIVE : StateIndicator::State::OFF);
+    }
 
-    // Indicator 1
-    indicators[1] = new StateIndicator(ind_container, 12);
-    indicators[1]->color(StateIndicator::State::OFF, BaseTheme::Color::getMacroColor(3))
-                 .color(StateIndicator::State::ACTIVE, BaseTheme::Color::getMacroColor(3))
-                 .opacity(StateIndicator::State::OFF, LV_OPA_40)
-                 .opacity(StateIndicator::State::ACTIVE, LV_OPA_COVER);
-    indicators[1]->setState(StateIndicator::State::ACTIVE);
-
-    // Indicator 2
-    indicators[2] = new StateIndicator(ind_container, 12);
-    indicators[2]->color(StateIndicator::State::OFF, BaseTheme::Color::getMacroColor(5))
-                 .color(StateIndicator::State::ACTIVE, BaseTheme::Color::getMacroColor(5))
-                 .opacity(StateIndicator::State::OFF, LV_OPA_40)
-                 .opacity(StateIndicator::State::ACTIVE, LV_OPA_COVER);
-    indicators[2]->setState(StateIndicator::State::OFF);
-
-    // Status label for indicators column
     status_label = new Label(ind_container);
-    status_label->color(BaseTheme::Color::TEXT_PRIMARY)
-                .alignment(LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_width(status_label->getElement(), lv_pct(100));
+    status_label->color(base_theme::color::TEXT_PRIMARY).alignment(LV_TEXT_ALIGN_CENTER);
     status_label->setText("Status");
+
+    // Empty slot 7 (placeholder)
+    lv_obj_t* placeholder = lv_obj_create(body);
+    lv_obj_set_style_bg_opa(placeholder, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(placeholder, 0, 0);
+    lv_obj_set_grid_cell(placeholder, LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+
+    // ========================================================================
+    // TransportBar (20px height)
+    // ========================================================================
+    lv_obj_t* transport_bar = lv_obj_create(screen_container);
+    lv_obj_set_size(transport_bar, LV_PCT(100), TRANSPORT_BAR_HEIGHT);
+    lv_obj_set_style_bg_color(transport_bar, lv_color_hex(base_theme::color::INACTIVE), 0);
+    lv_obj_set_style_border_width(transport_bar, 0, 0);
+    lv_obj_set_style_pad_all(transport_bar, 0, 0);
+    lv_obj_set_scrollbar_mode(transport_bar, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t* transport_label = lv_label_create(transport_bar);
+    lv_label_set_text(transport_label, "120.0 BPM  |  1.1.1");
+    lv_obj_set_style_text_color(transport_label, lv_color_hex(base_theme::color::TEXT_SECONDARY), 0);
+    lv_obj_center(transport_label);
 }
