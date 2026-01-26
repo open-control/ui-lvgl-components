@@ -11,8 +11,6 @@
   "frameworks": "*",
   "platforms": "*",
   "dependencies": {
-    "open-control/framework": ">=0.1.0 <1.0.0",
-    "open-control/ui-lvgl": ">=0.1.0 <1.0.0",
     "lvgl/lvgl": "^9.4.0"
   },
   "build": {
