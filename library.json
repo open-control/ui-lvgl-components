@@ -1,5 +1,5 @@
 {
-  "name": "ui-lvgl-components",
+  "name": "oc-ui-lvgl-components",
   "version": "0.2.0",
   "description": "Reusable LVGL UI components for Open Control",
   "keywords": ["open-control", "lvgl", "ui", "components", "widgets"],
