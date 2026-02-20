@@ -56,6 +56,7 @@ public:
     KnobWidget& trackColor(uint32_t color);  ///< Arc filled portion
     KnobWidget& valueColor(uint32_t color);  ///< Indicator line + center
     KnobWidget& flashColor(uint32_t color);  ///< Flash on value change
+    KnobWidget& flashEnabled(bool enabled);  ///< Enable/disable flash animation
 
     // Ribbon Configuration (modulated value arc)
     KnobWidget& ribbonColor(uint32_t color);         ///< Ribbon arc color
@@ -118,6 +119,7 @@ private:
     uint32_t track_color_ = 0;
     uint32_t value_color_ = 0;
     uint32_t flash_color_ = 0;
+    bool flash_enabled_ = true;
 
     // Ribbon configuration
     uint32_t ribbon_color_ = 0;
@@ -141,6 +143,14 @@ private:
     float indicator_thickness_ = 0.0f;
     float center_x_ = 0.0f;  // container width / 2
     float center_y_ = 0.0f;  // container height / 2
+
+    // Cached draw state to skip redundant LVGL updates
+    int16_t arc_start_angle_ = -32768;
+    int16_t arc_end_angle_ = -32768;
+    int16_t ribbon_start_angle_ = -32768;
+    int16_t ribbon_end_angle_ = -32768;
+    float indicator_end_x_ = -1.0f;
+    float indicator_end_y_ = -1.0f;
 };
 
 }  // namespace oc::ui::lvgl

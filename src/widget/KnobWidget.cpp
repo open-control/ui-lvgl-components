@@ -26,6 +26,7 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
       track_color_(other.track_color_),
       value_color_(other.value_color_),
       flash_color_(other.flash_color_),
+      flash_enabled_(other.flash_enabled_),
       ribbon_color_(other.ribbon_color_),
       ribbon_opa_(other.ribbon_opa_),
       ribbon_thickness_ratio_(other.ribbon_thickness_ratio_),
@@ -39,7 +40,13 @@ KnobWidget::KnobWidget(KnobWidget&& other) noexcept
       arc_radius_(other.arc_radius_),
       indicator_thickness_(other.indicator_thickness_),
       center_x_(other.center_x_),
-      center_y_(other.center_y_) {
+      center_y_(other.center_y_),
+      arc_start_angle_(other.arc_start_angle_),
+      arc_end_angle_(other.arc_end_angle_),
+      ribbon_start_angle_(other.ribbon_start_angle_),
+      ribbon_end_angle_(other.ribbon_end_angle_),
+      indicator_end_x_(other.indicator_end_x_),
+      indicator_end_y_(other.indicator_end_y_) {
     line_points_[0] = other.line_points_[0];
     line_points_[1] = other.line_points_[1];
     other.container_ = nullptr;
@@ -67,6 +74,7 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         track_color_ = other.track_color_;
         value_color_ = other.value_color_;
         flash_color_ = other.flash_color_;
+        flash_enabled_ = other.flash_enabled_;
         ribbon_color_ = other.ribbon_color_;
         ribbon_opa_ = other.ribbon_opa_;
         ribbon_thickness_ratio_ = other.ribbon_thickness_ratio_;
@@ -81,6 +89,12 @@ KnobWidget& KnobWidget::operator=(KnobWidget&& other) noexcept {
         indicator_thickness_ = other.indicator_thickness_;
         center_x_ = other.center_x_;
         center_y_ = other.center_y_;
+        arc_start_angle_ = other.arc_start_angle_;
+        arc_end_angle_ = other.arc_end_angle_;
+        ribbon_start_angle_ = other.ribbon_start_angle_;
+        ribbon_end_angle_ = other.ribbon_end_angle_;
+        indicator_end_x_ = other.indicator_end_x_;
+        indicator_end_y_ = other.indicator_end_y_;
         other.container_ = nullptr;
         other.arc_ = nullptr;
         other.ribbon_arc_ = nullptr;
@@ -257,6 +271,8 @@ void KnobWidget::updateGeometry() {
 
     // Update indicator line
     if (indicator_) {
+        lv_obj_set_size(indicator_, static_cast<lv_coord_t>(knob_size_), static_cast<lv_coord_t>(knob_size_));
+        lv_obj_center(indicator_);
         lv_obj_set_style_line_width(indicator_, indicator_thickness, 0);
         line_points_[0].x = center_x_;
         line_points_[0].y = center_y_;
@@ -271,6 +287,13 @@ void KnobWidget::updateGeometry() {
         lv_obj_set_size(inner_circle_, inner_circle_size, inner_circle_size);
         lv_obj_center(inner_circle_);
     }
+
+    arc_start_angle_ = -32768;
+    arc_end_angle_ = -32768;
+    ribbon_start_angle_ = -32768;
+    ribbon_end_angle_ = -32768;
+    indicator_end_x_ = -1.0f;
+    indicator_end_y_ = -1.0f;
 
     // Update arc value display
     updateArc();
@@ -291,6 +314,9 @@ void KnobWidget::applyColors() {
     }
     if (center_circle_) {
         lv_obj_set_style_bg_color(center_circle_, lv_color_hex(value_col), 0);
+    }
+    if (inner_circle_ && !flash_enabled_) {
+        lv_obj_set_style_bg_color(inner_circle_, lv_color_hex(bg), 0);
     }
 }
 
@@ -341,6 +367,23 @@ KnobWidget& KnobWidget::flashColor(uint32_t color) {
     return *this;
 }
 
+KnobWidget& KnobWidget::flashEnabled(bool enabled) {
+    flash_enabled_ = enabled;
+
+    if (!flash_enabled_) {
+        if (flash_timer_) {
+            lv_timer_delete(flash_timer_);
+            flash_timer_ = nullptr;
+        }
+        if (inner_circle_) {
+            uint32_t bg = bg_color_ != 0 ? bg_color_ : base_theme::color::INACTIVE;
+            lv_obj_set_style_bg_color(inner_circle_, lv_color_hex(bg), 0);
+        }
+    }
+
+    return *this;
+}
+
 KnobWidget& KnobWidget::ribbonColor(uint32_t color) {
     ribbon_color_ = color;
     applyRibbonColors();
@@ -371,7 +414,9 @@ void KnobWidget::setValue(float value) {
 
     value_ = clamped;
     updateArc();
-    triggerFlash();
+    if (flash_enabled_) {
+        triggerFlash();
+    }
 }
 
 void KnobWidget::setVisible(bool visible) {
@@ -385,6 +430,10 @@ void KnobWidget::setVisible(bool visible) {
 
 void KnobWidget::setRibbonValue(float value) {
     float clamped = std::clamp(value, 0.0f, 1.0f);
+    if (std::abs(ribbon_value_ - clamped) < 0.001f && ribbon_enabled_) {
+        return;
+    }
+
     ribbon_value_ = clamped;
     // Lazy-create ribbon arc on first use
     if (!ribbon_arc_) {
@@ -401,6 +450,10 @@ void KnobWidget::setRibbonValue(float value) {
 }
 
 void KnobWidget::setRibbonEnabled(bool enabled) {
+    if (ribbon_enabled_ == enabled) {
+        return;
+    }
+
     ribbon_enabled_ = enabled;
     if (enabled && !ribbon_arc_) {
         // Lazy-create ribbon arc
@@ -420,46 +473,56 @@ void KnobWidget::setRibbonEnabled(bool enabled) {
 void KnobWidget::updateRibbon() {
     if (!ribbon_arc_ || !ribbon_enabled_ || arc_radius_ <= 0.0f) return;
 
-    float value_angle = normalizedToAngle(value_);
-    float ribbon_angle = normalizedToAngle(ribbon_value_);
+    const int16_t value_angle = static_cast<int16_t>(std::round(normalizedToAngle(value_)));
+    const int16_t ribbon_angle = static_cast<int16_t>(std::round(normalizedToAngle(ribbon_value_)));
 
-    // Ribbon shows between value and ribbon_value
-    if (ribbon_value_ >= value_) {
-        lv_arc_set_angles(ribbon_arc_, static_cast<int16_t>(value_angle),
-                         static_cast<int16_t>(ribbon_angle));
-    } else {
-        lv_arc_set_angles(ribbon_arc_, static_cast<int16_t>(ribbon_angle),
-                         static_cast<int16_t>(value_angle));
+    const int16_t start = std::min(value_angle, ribbon_angle);
+    const int16_t end = std::max(value_angle, ribbon_angle);
+
+    if (ribbon_start_angle_ == start && ribbon_end_angle_ == end) {
+        return;
     }
+
+    lv_arc_set_angles(ribbon_arc_, start, end);
+    ribbon_start_angle_ = start;
+    ribbon_end_angle_ = end;
 }
 
 void KnobWidget::updateArc() {
     if (!arc_ || !indicator_ || arc_radius_ <= 0.0f) return;
 
-    float origin_angle = normalizedToAngle(origin_);
-    float value_angle = normalizedToAngle(value_);
+    const int16_t origin_angle = static_cast<int16_t>(std::round(normalizedToAngle(origin_)));
+    const int16_t value_angle = static_cast<int16_t>(std::round(normalizedToAngle(value_)));
 
-    if (value_ >= origin_) {
-        lv_arc_set_angles(arc_, static_cast<int16_t>(origin_angle),
-                         static_cast<int16_t>(value_angle));
-    } else {
-        lv_arc_set_angles(arc_, static_cast<int16_t>(value_angle),
-                         static_cast<int16_t>(origin_angle));
+    const int16_t start = std::min(origin_angle, value_angle);
+    const int16_t end = std::max(origin_angle, value_angle);
+
+    if (arc_start_angle_ != start || arc_end_angle_ != end) {
+        lv_arc_set_angles(arc_, start, end);
+        arc_start_angle_ = start;
+        arc_end_angle_ = end;
     }
 
-    float angle_rad = value_angle * static_cast<float>(M_PI) / 180.0f;
+    const float angle_rad = static_cast<float>(value_angle) * static_cast<float>(M_PI) / 180.0f;
     updateIndicatorLine(angle_rad);
 }
 
 void KnobWidget::updateIndicatorLine(float angleRad) {
     // All calculations in float for precision
-    float end_x = center_x_ + arc_radius_ * std::cos(angleRad);
-    float end_y = center_y_ + arc_radius_ * std::sin(angleRad);
+    const float end_x = center_x_ + arc_radius_ * std::cos(angleRad);
+    const float end_y = center_y_ + arc_radius_ * std::sin(angleRad);
+
+    if (std::abs(indicator_end_x_ - end_x) < 0.25f &&
+        std::abs(indicator_end_y_ - end_y) < 0.25f) {
+        return;
+    }
 
     // Update line endpoint (lv_point_precise_t uses float)
     line_points_[1].x = end_x;
     line_points_[1].y = end_y;
-    lv_obj_refresh_self_size(indicator_);
+    indicator_end_x_ = end_x;
+    indicator_end_y_ = end_y;
+    lv_obj_invalidate(indicator_);
 }
 
 float KnobWidget::normalizedToAngle(float normalized) const {
@@ -467,7 +530,7 @@ float KnobWidget::normalizedToAngle(float normalized) const {
 }
 
 void KnobWidget::triggerFlash() {
-    if (!inner_circle_) return;
+    if (!flash_enabled_ || !inner_circle_) return;
 
     // Rate-limit flash to avoid excessive timer creation during rapid encoder movement
     uint32_t now = lv_tick_get();
