@@ -1,5 +1,8 @@
 #include <oc/ui/lvgl/widget/Label.hpp>
 
+#include <config/PlatformCompat.hpp>
+#include <oc/type/TextFormat.hpp>
+
 namespace oc::ui::lvgl {
 
 // =============================================================================
@@ -65,7 +68,7 @@ Label& Label::operator=(Label&& other) noexcept {
     return *this;
 }
 
-void Label::createWidgets(lv_obj_t* parent) {
+FLASHMEM void Label::createWidgets(lv_obj_t* parent) {
     // Container that clips overflow
     container_ = lv_obj_create(parent);
     // Default size: 100% width, content height
@@ -179,7 +182,12 @@ void Label::setText(const std::string& text) {
 void Label::setText(int value, const char* prefix, const char* suffix) {
     if (!label_) return;
     stopScrollAnimation();
-    lv_label_set_text_fmt(label_, "%s%d%s", prefix, value, suffix);
+    char text[32];
+    size_t pos = oc::type::text::appendString(text, sizeof(text), 0, prefix ? prefix : "");
+    pos = oc::type::text::appendSigned(text, sizeof(text), pos, value);
+    pos = oc::type::text::appendString(text, sizeof(text), pos, suffix ? suffix : "");
+    oc::type::text::terminate(text, sizeof(text), pos);
+    lv_label_set_text(label_, text);
     if (auto_scroll_enabled_) {
         checkOverflowAndScroll();
     } else {
@@ -190,9 +198,15 @@ void Label::setText(int value, const char* prefix, const char* suffix) {
 void Label::setText(float value, uint8_t decimals, const char* prefix, const char* suffix) {
     if (!label_) return;
     stopScrollAnimation();
-    char fmt[16];
-    lv_snprintf(fmt, sizeof(fmt), "%%s%%.%uf%%s", decimals);
-    lv_label_set_text_fmt(label_, fmt, prefix, value, suffix);
+    char numeric[24];
+    oc::type::text::formatFixed(numeric, sizeof(numeric), value, decimals);
+
+    char text[40];
+    size_t pos = oc::type::text::appendString(text, sizeof(text), 0, prefix ? prefix : "");
+    pos = oc::type::text::appendString(text, sizeof(text), pos, numeric);
+    pos = oc::type::text::appendString(text, sizeof(text), pos, suffix ? suffix : "");
+    oc::type::text::terminate(text, sizeof(text), pos);
+    lv_label_set_text(label_, text);
     if (auto_scroll_enabled_) {
         checkOverflowAndScroll();
     } else {

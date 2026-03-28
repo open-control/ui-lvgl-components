@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include <lvgl.h>
 
@@ -10,6 +11,11 @@
 #include "../theme/BaseTheme.hpp"
 
 namespace oc::ui::lvgl {
+
+enum class KnobRenderProfile : uint8_t {
+    Full,
+    ArcOnly,
+};
 
 /**
  * @brief Rotary knob widget with arc visualization
@@ -57,6 +63,8 @@ public:
     KnobWidget& valueColor(uint32_t color);  ///< Indicator line + center
     KnobWidget& flashColor(uint32_t color);  ///< Flash on value change
     KnobWidget& flashEnabled(bool enabled);  ///< Enable/disable flash animation
+    KnobWidget& renderProfile(KnobRenderProfile profile);
+    KnobWidget& centerTextFont(const lv_font_t* font);
 
     // Ribbon Configuration (modulated value arc)
     KnobWidget& ribbonColor(uint32_t color);         ///< Ribbon arc color
@@ -71,13 +79,15 @@ public:
     float getValue() const { return value_; }
     void setRibbonValue(float value);                ///< Set ribbon position (auto-enables ribbon)
     void setRibbonEnabled(bool enabled);             ///< Show/hide ribbon arc
+    void setCenterText(const char* text);            ///< Optional centered text overlay
     void setVisible(bool visible);
 
 private:
     // Fixed proportions (relative to knob size)
     static constexpr uint16_t MIN_SIZE = 30;
     static constexpr uint32_t FLASH_RATE_LIMIT_MS = 80;    // Min interval between flashes
-    static constexpr float ARC_WIDTH_RATIO = 0.13f;        // Arc width as ratio of size
+    static constexpr float ARC_WIDTH_RATIO = 0.13f;        // Full profile arc width as ratio of size
+    static constexpr float ARC_ONLY_WIDTH_RATIO = 0.11f;   // ArcOnly profile arc width as ratio of size
     static constexpr float INDICATOR_RATIO = 0.13f;        // Indicator thickness ratio
     static constexpr float CENTER_CIRCLE_RATIO = 0.22f;    // Center circle size ratio
     static constexpr float INNER_CIRCLE_RATIO = 0.10f;     // Inner circle size ratio
@@ -86,16 +96,18 @@ private:
     static constexpr float ARC_SWEEP_DEGREES = 270.0f;
 
     void createUI();
+    void createBackgroundArc();
     void createArc();
     void createRibbon();
     void createIndicator();
     void createCenterCircles();
     void applyColors();
     void applyRibbonColors();
+    void applyRenderProfile();
     void updateGeometry();
-    void updateArc();
+    bool updateArc();
     void updateRibbon();
-    void updateIndicatorLine(float angleRad);
+    bool updateIndicatorLine(float angleRad);
     void triggerFlash();
     static void flashTimerCallback(lv_timer_t* timer);
     static void sizeChangedCallback(lv_event_t* e);
@@ -104,11 +116,13 @@ private:
 
     // LVGL objects
     lv_obj_t* container_ = nullptr;
+    lv_obj_t* background_arc_ = nullptr;
     lv_obj_t* arc_ = nullptr;
     lv_obj_t* ribbon_arc_ = nullptr;
     lv_obj_t* indicator_ = nullptr;
     lv_obj_t* center_circle_ = nullptr;
     lv_obj_t* inner_circle_ = nullptr;
+    lv_obj_t* center_label_ = nullptr;
     lv_timer_t* flash_timer_ = nullptr;
 
     // Indicator line points
@@ -120,6 +134,8 @@ private:
     uint32_t value_color_ = 0;
     uint32_t flash_color_ = 0;
     bool flash_enabled_ = true;
+    KnobRenderProfile render_profile_ = KnobRenderProfile::Full;
+    const lv_font_t* center_text_font_ = nullptr;
 
     // Ribbon configuration
     uint32_t ribbon_color_ = 0;
@@ -133,6 +149,7 @@ private:
     bool centered_ = false;
     bool ribbon_enabled_ = false;
     uint32_t last_flash_ms_ = 0;
+    std::string center_text_;
 
     // Size policy
     SquareSizePolicy size_policy_;
@@ -145,6 +162,16 @@ private:
     float center_y_ = 0.0f;  // container height / 2
 
     // Cached draw state to skip redundant LVGL updates
+    lv_coord_t last_layout_width_ = -1;
+    lv_coord_t last_layout_height_ = -1;
+    lv_coord_t last_arc_size_ = -1;
+    lv_coord_t last_arc_width_ = -1;
+    lv_coord_t last_ribbon_width_ = -1;
+    lv_coord_t last_indicator_size_ = -1;
+    lv_coord_t last_indicator_thickness_ = -1;
+    lv_coord_t last_center_circle_size_ = -1;
+    lv_coord_t last_inner_circle_size_ = -1;
+    lv_coord_t last_center_label_width_ = -1;
     int16_t arc_start_angle_ = -32768;
     int16_t arc_end_angle_ = -32768;
     int16_t ribbon_start_angle_ = -32768;

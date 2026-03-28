@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <config/PlatformCompat.hpp>
 #include <oc/ui/lvgl/theme/BaseTheme.hpp>
 
 namespace oc::ui::lvgl::widget {
@@ -310,7 +311,7 @@ void VirtualList::hide() {
 // Private: Container & Slots Creation
 // ══════════════════════════════════════════════════════════════════════════════
 
-void VirtualList::createContainer() {
+FLASHMEM void VirtualList::createContainer() {
     container_ = lv_obj_create(parent_);
     lv_obj_set_size(container_, LV_PCT(100), LV_PCT(100));
     lv_obj_set_flex_grow(container_, 1);
@@ -333,7 +334,7 @@ void VirtualList::createContainer() {
     lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
 }
 
-void VirtualList::createSlots() {
+FLASHMEM void VirtualList::createSlots() {
     slots_.reserve(visibleCount_);
 
     // Calculate item height if auto-sizing and not yet calculated

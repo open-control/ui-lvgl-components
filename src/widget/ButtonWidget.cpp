@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include <config/PlatformCompat.hpp>
+
 namespace oc::ui::lvgl {
 
 ButtonWidget::ButtonWidget(lv_obj_t* parent) {
@@ -63,7 +65,7 @@ void ButtonWidget::cleanup() {
     state_label_ = nullptr;
 }
 
-void ButtonWidget::createUI() {
+FLASHMEM void ButtonWidget::createUI() {
     // Container setup - transparent, no padding
     lv_obj_set_style_bg_opa(container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container_, 0, 0);

@@ -1,5 +1,6 @@
 #include <oc/ui/lvgl/component/ParameterEnum.hpp>
 
+#include <config/PlatformCompat.hpp>
 #include <oc/ui/lvgl/theme/BaseTheme.hpp>
 
 namespace oc::ui::lvgl {
@@ -44,7 +45,7 @@ bool ParameterEnum::isVisible() const {
     return container_ && !lv_obj_has_flag(container_, LV_OBJ_FLAG_HIDDEN);
 }
 
-void ParameterEnum::createUI(lv_obj_t* parent) {
+FLASHMEM void ParameterEnum::createUI(lv_obj_t* parent) {
     // Container - 100% of parent, grid layout (same pattern as other Parameter* components)
     container_ = lv_obj_create(parent);
     lv_obj_set_size(container_, LV_PCT(100), LV_PCT(100));
