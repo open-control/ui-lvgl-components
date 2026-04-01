@@ -262,7 +262,7 @@ FLASHMEM void KnobWidget::createCenterCircles() {
     lv_obj_add_flag(inner_circle_, LV_OBJ_FLAG_EVENT_BUBBLE);
 }
 
-void KnobWidget::applyRenderProfile() {
+FLASHMEM void KnobWidget::applyRenderProfile() {
     const bool arc_only = render_profile_ == KnobRenderProfile::ArcOnly;
 
     if (background_arc_) {
@@ -292,7 +292,7 @@ void KnobWidget::sizeChangedCallback(lv_event_t* e) {
     if (widget) widget->updateGeometry();
 }
 
-void KnobWidget::updateGeometry() {
+FLASHMEM void KnobWidget::updateGeometry() {
     if (!container_) return;
 
     const auto result = size_policy_.compute(container_);
@@ -434,7 +434,7 @@ void KnobWidget::updateGeometry() {
     updateRibbon();
 }
 
-void KnobWidget::applyColors() {
+FLASHMEM void KnobWidget::applyColors() {
     const uint32_t bg = bg_color_ != 0 ? bg_color_ : base_theme::color::INACTIVE;
     const uint32_t track = track_color_ != 0 ? track_color_ : base_theme::color::KNOB_TRACK;
     const uint32_t value_col = value_color_ != 0 ? value_color_ : base_theme::color::KNOB_VALUE;
@@ -466,7 +466,7 @@ void KnobWidget::applyColors() {
     }
 }
 
-void KnobWidget::applyRibbonColors() {
+FLASHMEM void KnobWidget::applyRibbonColors() {
     if (!ribbon_arc_) return;
     const uint32_t color = ribbon_color_ != 0 ? ribbon_color_ : base_theme::color::MACRO_6_BLUE;
     lv_obj_set_style_arc_color(ribbon_arc_, lv_color_hex(color), LV_PART_INDICATOR);
@@ -694,7 +694,7 @@ float KnobWidget::normalizedToAngle(float normalized) const {
     return START_ANGLE + (normalized * ARC_SWEEP_DEGREES);
 }
 
-void KnobWidget::triggerFlash() {
+FLASHMEM void KnobWidget::triggerFlash() {
     if (!flash_enabled_ || !inner_circle_ || render_profile_ == KnobRenderProfile::ArcOnly) return;
 
     const uint32_t now = lv_tick_get();
@@ -713,7 +713,7 @@ void KnobWidget::triggerFlash() {
     lv_timer_set_repeat_count(flash_timer_, 1);
 }
 
-void KnobWidget::flashTimerCallback(lv_timer_t* timer) {
+FLASHMEM void KnobWidget::flashTimerCallback(lv_timer_t* timer) {
     auto* widget = static_cast<KnobWidget*>(lv_timer_get_user_data(timer));
     if (!widget || !widget->inner_circle_) return;
 
