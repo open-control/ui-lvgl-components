@@ -27,6 +27,7 @@
  * @endcode
  */
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -141,6 +142,11 @@ public:
      * @param enabled true to animate page transitions (default: false)
      */
     VirtualList& animateScroll(bool enabled);
+
+    /**
+     * @brief Configure the built-in selection cursor visuals.
+     */
+    VirtualList& selectionCursorStyle(uint32_t color, lv_opa_t opa, lv_coord_t radius);
 
     /**
      * @brief Set padding around the list content
@@ -258,6 +264,10 @@ private:
     void updateHighlightOnly(int oldIndex, int newIndex);
     void rebindSlot(VirtualSlot& slot, int newIndex);
     void updateSlotHighlight(VirtualSlot& slot, bool isSelected);
+    void createSelectionCursor();
+    void updateSelectionCursor();
+    void moveSelectionCursorToSlot(VirtualSlot& slot);
+    void hideSelectionCursor();
 
     // Animation
     void animateToWindowStart(int targetStart);
@@ -295,6 +305,17 @@ private:
     // Animation state
     lv_anim_t scrollAnim_;
     bool animRunning_ = false;
+
+    // Built-in selection cursor
+    lv_obj_t* selectionCursor_ = nullptr;
+    uint32_t selectionCursorColor_ = 0x666666;
+    lv_opa_t selectionCursorOpa_ = LV_OPA_40;
+    lv_coord_t selectionCursorRadius_ = 2;
+    bool selectionCursorVisible_ = false;
+    lv_coord_t selectionCursorX_ = -1;
+    lv_coord_t selectionCursorY_ = -1;
+    lv_coord_t selectionCursorWidth_ = -1;
+    lv_coord_t selectionCursorHeight_ = -1;
 };
 
 }  // namespace oc::ui::lvgl::widget
