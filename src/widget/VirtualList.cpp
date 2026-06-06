@@ -18,6 +18,7 @@ VirtualList::VirtualList(lv_obj_t* parent) : parent_(parent) {
     marginH_ = base_theme::layout::MARGIN_MD;
 
     createContainer();
+    createSelectionCursor();
 }
 
 VirtualList::~VirtualList() {
@@ -36,6 +37,7 @@ VirtualList::~VirtualList() {
     if (container_) {
         lv_obj_delete(container_);
         container_ = nullptr;
+        selectionCursor_ = nullptr;
     }
 }
 
@@ -59,8 +61,18 @@ VirtualList::VirtualList(VirtualList&& other) noexcept
     , padding_(other.padding_)
     , itemGap_(other.itemGap_)
     , marginH_(other.marginH_)
-    , animRunning_(other.animRunning_) {
+    , animRunning_(other.animRunning_)
+    , selectionCursor_(other.selectionCursor_)
+    , selectionCursorColor_(other.selectionCursorColor_)
+    , selectionCursorOpa_(other.selectionCursorOpa_)
+    , selectionCursorRadius_(other.selectionCursorRadius_)
+    , selectionCursorVisible_(other.selectionCursorVisible_)
+    , selectionCursorX_(other.selectionCursorX_)
+    , selectionCursorY_(other.selectionCursorY_)
+    , selectionCursorWidth_(other.selectionCursorWidth_)
+    , selectionCursorHeight_(other.selectionCursorHeight_) {
     other.container_ = nullptr;
+    other.selectionCursor_ = nullptr;
     other.parent_ = nullptr;
     other.animRunning_ = false;
 }
@@ -99,8 +111,18 @@ VirtualList& VirtualList::operator=(VirtualList&& other) noexcept {
         itemGap_ = other.itemGap_;
         marginH_ = other.marginH_;
         animRunning_ = other.animRunning_;
+        selectionCursor_ = other.selectionCursor_;
+        selectionCursorColor_ = other.selectionCursorColor_;
+        selectionCursorOpa_ = other.selectionCursorOpa_;
+        selectionCursorRadius_ = other.selectionCursorRadius_;
+        selectionCursorVisible_ = other.selectionCursorVisible_;
+        selectionCursorX_ = other.selectionCursorX_;
+        selectionCursorY_ = other.selectionCursorY_;
+        selectionCursorWidth_ = other.selectionCursorWidth_;
+        selectionCursorHeight_ = other.selectionCursorHeight_;
 
         other.container_ = nullptr;
+        other.selectionCursor_ = nullptr;
         other.parent_ = nullptr;
         other.animRunning_ = false;
     }
@@ -176,6 +198,18 @@ VirtualList& VirtualList::animateScroll(bool enabled) {
     return *this;
 }
 
+VirtualList& VirtualList::selectionCursorStyle(uint32_t color, lv_opa_t opa, lv_coord_t radius) {
+    selectionCursorColor_ = color;
+    selectionCursorOpa_ = opa;
+    selectionCursorRadius_ = radius;
+    if (selectionCursor_) {
+        lv_obj_set_style_bg_color(selectionCursor_, lv_color_hex(selectionCursorColor_), LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(selectionCursor_, selectionCursorOpa_, LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(selectionCursor_, selectionCursorRadius_, LV_STATE_DEFAULT);
+    }
+    return *this;
+}
+
 VirtualList& VirtualList::padding(int16_t pad) {
     padding_ = pad;
     if (container_) {
@@ -237,6 +271,8 @@ bool VirtualList::setTotalCount(int count) {
         windowStart_ = -1;  // Force recalculation
         previousSelectedIndex_ = -1;
         rebindAllSlots();
+    } else if (totalCount_ == 0) {
+        hideSelectionCursor();
     }
 
     return changed;
@@ -247,7 +283,10 @@ bool VirtualList::setTotalCount(int count) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 void VirtualList::setSelectedIndex(int index) {
-    if (totalCount_ == 0) return;
+    if (totalCount_ == 0) {
+        hideSelectionCursor();
+        return;
+    }
 
     index = std::clamp(index, 0, totalCount_ - 1);
     if (selectedIndex_ == index) return;
@@ -297,6 +336,7 @@ void VirtualList::show() {
         }
 
         rebindAllSlots();
+        updateSelectionCursor();
     }
 }
 
@@ -304,6 +344,7 @@ void VirtualList::hide() {
     if (container_) {
         lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
         visible_ = false;
+        hideSelectionCursor();
     }
 }
 
@@ -374,6 +415,10 @@ FLASHMEM void VirtualList::createSlots() {
 
         slots_.push_back(slot);
     }
+
+    if (selectionCursor_) {
+        lv_obj_move_background(selectionCursor_);
+    }
 }
 
 void VirtualList::recalculateItemHeight() {
@@ -434,7 +479,10 @@ int VirtualList::logicalIndexToSlotIndex(int logicalIndex) const {
 }
 
 void VirtualList::rebindAllSlots() {
-    if (!onBindSlot_ || totalCount_ == 0) return;
+    if (!onBindSlot_ || totalCount_ == 0) {
+        hideSelectionCursor();
+        return;
+    }
 
     int newWindowStart = calculateWindowStart();
     windowStart_ = newWindowStart;
@@ -455,6 +503,7 @@ void VirtualList::rebindAllSlots() {
     }
 
     previousSelectedIndex_ = selectedIndex_;
+    updateSelectionCursor();
 }
 
 void VirtualList::updateSelection(int oldIndex, int newIndex) {
@@ -471,6 +520,7 @@ void VirtualList::updateSelection(int oldIndex, int newIndex) {
         // Same window: just update highlights
         updateHighlightOnly(oldIndex, newIndex);
     }
+    updateSelectionCursor();
 }
 
 void VirtualList::updateHighlightOnly(int oldIndex, int newIndex) {
@@ -507,6 +557,80 @@ void VirtualList::updateSlotHighlight(VirtualSlot& slot, bool isSelected) {
     } else if (onBindSlot_ && slot.boundIndex >= 0) {
         onBindSlot_(slot, slot.boundIndex, isSelected);
     }
+}
+
+void VirtualList::createSelectionCursor() {
+    if (!container_ || selectionCursor_) return;
+
+    selectionCursor_ = lv_obj_create(container_);
+    lv_obj_remove_style_all(selectionCursor_);
+    lv_obj_add_flag(selectionCursor_, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_clear_flag(selectionCursor_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(selectionCursor_, lv_color_hex(selectionCursorColor_), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(selectionCursor_, selectionCursorOpa_, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(selectionCursor_, 0, LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(selectionCursor_, selectionCursorRadius_, LV_STATE_DEFAULT);
+    lv_obj_add_flag(selectionCursor_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_background(selectionCursor_);
+}
+
+void VirtualList::updateSelectionCursor() {
+    if (!selectionCursor_ || totalCount_ <= 0 || !visible_) {
+        hideSelectionCursor();
+        return;
+    }
+
+    const int slotIdx = logicalIndexToSlotIndex(selectedIndex_);
+    if (slotIdx < 0 || slotIdx >= static_cast<int>(slots_.size())) {
+        hideSelectionCursor();
+        return;
+    }
+
+    moveSelectionCursorToSlot(slots_[slotIdx]);
+}
+
+void VirtualList::moveSelectionCursorToSlot(VirtualSlot& slot) {
+    if (!selectionCursor_ || !slot.container || lv_obj_has_flag(slot.container, LV_OBJ_FLAG_HIDDEN)) {
+        hideSelectionCursor();
+        return;
+    }
+
+    lv_coord_t nextX = lv_obj_get_x(slot.container);
+    lv_coord_t nextY = lv_obj_get_y(slot.container);
+    lv_coord_t nextW = lv_obj_get_width(slot.container);
+    lv_coord_t nextH = lv_obj_get_height(slot.container);
+    if ((nextW <= 0 || nextH <= 0) && container_) {
+        lv_obj_update_layout(container_);
+        nextX = lv_obj_get_x(slot.container);
+        nextY = lv_obj_get_y(slot.container);
+        nextW = lv_obj_get_width(slot.container);
+        nextH = lv_obj_get_height(slot.container);
+    }
+    if (nextW <= 0 || nextH <= 0) {
+        hideSelectionCursor();
+        return;
+    }
+
+    if (!selectionCursorVisible_) {
+        lv_obj_clear_flag(selectionCursor_, LV_OBJ_FLAG_HIDDEN);
+        selectionCursorVisible_ = true;
+    }
+    if (selectionCursorX_ != nextX || selectionCursorY_ != nextY) {
+        lv_obj_set_pos(selectionCursor_, nextX, nextY);
+        selectionCursorX_ = nextX;
+        selectionCursorY_ = nextY;
+    }
+    if (selectionCursorWidth_ != nextW || selectionCursorHeight_ != nextH) {
+        lv_obj_set_size(selectionCursor_, nextW, nextH);
+        selectionCursorWidth_ = nextW;
+        selectionCursorHeight_ = nextH;
+    }
+}
+
+void VirtualList::hideSelectionCursor() {
+    if (!selectionCursor_ || !selectionCursorVisible_) return;
+    lv_obj_add_flag(selectionCursor_, LV_OBJ_FLAG_HIDDEN);
+    selectionCursorVisible_ = false;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
