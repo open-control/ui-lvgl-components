@@ -10,7 +10,6 @@
  * Features:
  * - Auto-sizing: calculates item height from container dimensions
  * - Two scroll modes: PageBased (fixed pages) or CenterLocked (selection stays centered)
- * - Optional smooth scroll animation
  * - Fluent configuration API
  *
  * Usage:
@@ -55,20 +54,17 @@ enum class ScrollMode {
 struct VirtualSlot {
     lv_obj_t* container = nullptr;  ///< LVGL container (created by VirtualList)
     int boundIndex = -1;            ///< Currently bound logical index (-1 = unbound)
-    void* userData = nullptr;       ///< Free pointer for owner (reusable widgets)
 };
 
 /**
  * @brief Callback to bind a slot to a logical index
  *
- * @param slot       The slot to bind (container + userData)
+ * @param slot       The slot to bind
  * @param index      The logical index of the item to display
  * @param isSelected true if this item is currently selected
  *
- * The owner MUST:
- * - Reuse/update existing widgets in slot.userData
- * - OR create widgets if slot.userData == nullptr (first bind)
- * - Apply highlighted style if isSelected == true
+ * The owner must reuse widgets attached to slot.container and apply the
+ * highlighted style when isSelected is true.
  */
 using BindSlotCallback = std::function<void(VirtualSlot& slot, int index, bool isSelected)>;
 
@@ -102,11 +98,12 @@ public:
     explicit VirtualList(lv_obj_t* parent);
     ~VirtualList() override;
 
-    // Non-copyable, moveable
+    // LVGL callbacks retain this object's address for the container lifetime.
+    // Moving a live list would invalidate those callback contexts.
     VirtualList(const VirtualList&) = delete;
     VirtualList& operator=(const VirtualList&) = delete;
-    VirtualList(VirtualList&&) noexcept;
-    VirtualList& operator=(VirtualList&&) noexcept;
+    VirtualList(VirtualList&&) = delete;
+    VirtualList& operator=(VirtualList&&) = delete;
 
     // ══════════════════════════════════════════════════════════════════
     // Fluent Configuration
@@ -115,6 +112,9 @@ public:
     /**
      * @brief Set number of visible slots
      * @param count Number of items visible at once (default: 5)
+     *
+     * Configure this before prepare()/show(). The slot pool and widgets
+     * attached by the owner keep stable addresses for the list lifetime.
      */
     VirtualList& visibleCount(int count);
 
@@ -136,12 +136,6 @@ public:
      * @param mode PageBased (default) or CenterLocked
      */
     VirtualList& scrollMode(ScrollMode mode);
-
-    /**
-     * @brief Enable/disable smooth scroll animation
-     * @param enabled true to animate page transitions (default: false)
-     */
-    VirtualList& animateScroll(bool enabled);
 
     /**
      * @brief Configure the built-in selection cursor visuals.
@@ -203,7 +197,7 @@ public:
      * @brief Set the selected index
      *
      * - If index is in visible window: updates highlight only
-     * - If index moves out of window: rebinds slots (+ animation if enabled)
+     * - If index moves out of window: rebinds the fixed slot pool
      */
     void setSelectedIndex(int index);
     int getSelectedIndex() const { return selectedIndex_; }
@@ -245,6 +239,8 @@ public:
     // IComponent
     // ══════════════════════════════════════════════════════════════════
 
+    /** Build the fixed slot pool without making the list visible. */
+    void prepare();
     void show() override;
     void hide() override;
     bool isVisible() const override { return visible_; }
@@ -252,7 +248,7 @@ public:
 
 private:
     // Container & slots creation
-    void createContainer();
+    void createContainer(lv_obj_t* parent);
     void createSlots();
     void recalculateItemHeight();
 
@@ -262,21 +258,15 @@ private:
     void rebindAllSlots();
     void updateSelection(int oldIndex, int newIndex);
     void updateHighlightOnly(int oldIndex, int newIndex);
-    void rebindSlot(VirtualSlot& slot, int newIndex);
-    void updateSlotHighlight(VirtualSlot& slot, bool isSelected);
     void createSelectionCursor();
     void updateSelectionCursor();
     void moveSelectionCursorToSlot(VirtualSlot& slot);
     void hideSelectionCursor();
 
-    // Animation
-    void animateToWindowStart(int targetStart);
-    static void scrollAnimCallback(void* var, int32_t value);
-
     // Event handlers
     static void sizeChangedCallback(lv_event_t* e);
+    static void layoutChangedCallback(lv_event_t* e);
 
-    lv_obj_t* parent_ = nullptr;
     lv_obj_t* container_ = nullptr;
 
     std::vector<VirtualSlot> slots_;
@@ -286,14 +276,12 @@ private:
 
     int totalCount_ = 0;
     int selectedIndex_ = 0;
-    int previousSelectedIndex_ = -1;
     int windowStart_ = 0;
 
     BindSlotCallback onBindSlot_;
     UpdateHighlightCallback onUpdateHighlight_;
 
     ScrollMode scrollMode_ = ScrollMode::PageBased;
-    bool animateScroll_ = false;
     bool visible_ = false;
     bool initialized_ = false;
 
@@ -301,10 +289,6 @@ private:
     int16_t padding_ = 4;       // LIST_PAD default
     int16_t itemGap_ = 2;       // LIST_ITEM_GAP default
     int16_t marginH_ = 8;       // MARGIN_MD default
-
-    // Animation state
-    lv_anim_t scrollAnim_;
-    bool animRunning_ = false;
 
     // Built-in selection cursor
     lv_obj_t* selectionCursor_ = nullptr;

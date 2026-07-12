@@ -11,27 +11,17 @@ namespace oc::ui::lvgl::widget {
 // Construction / Destruction
 // ══════════════════════════════════════════════════════════════════════════════
 
-VirtualList::VirtualList(lv_obj_t* parent) : parent_(parent) {
+VirtualList::VirtualList(lv_obj_t* parent) {
     // Use theme defaults
     padding_ = base_theme::layout::LIST_PAD;
     itemGap_ = base_theme::layout::LIST_ITEM_GAP;
     marginH_ = base_theme::layout::MARGIN_MD;
 
-    createContainer();
+    createContainer(parent);
     createSelectionCursor();
 }
 
 VirtualList::~VirtualList() {
-    // Stop any running animation
-    if (animRunning_) {
-        lv_anim_delete(this, scrollAnimCallback);
-        animRunning_ = false;
-    }
-
-    // Clear slot userData pointers
-    for (auto& slot : slots_) {
-        slot.userData = nullptr;
-    }
     slots_.clear();
 
     if (container_) {
@@ -41,117 +31,15 @@ VirtualList::~VirtualList() {
     }
 }
 
-VirtualList::VirtualList(VirtualList&& other) noexcept
-    : parent_(other.parent_)
-    , container_(other.container_)
-    , slots_(std::move(other.slots_))
-    , visibleCount_(other.visibleCount_)
-    , itemHeight_(other.itemHeight_)
-    , autoSizing_(other.autoSizing_)
-    , totalCount_(other.totalCount_)
-    , selectedIndex_(other.selectedIndex_)
-    , previousSelectedIndex_(other.previousSelectedIndex_)
-    , windowStart_(other.windowStart_)
-    , onBindSlot_(std::move(other.onBindSlot_))
-    , onUpdateHighlight_(std::move(other.onUpdateHighlight_))
-    , scrollMode_(other.scrollMode_)
-    , animateScroll_(other.animateScroll_)
-    , visible_(other.visible_)
-    , initialized_(other.initialized_)
-    , padding_(other.padding_)
-    , itemGap_(other.itemGap_)
-    , marginH_(other.marginH_)
-    , animRunning_(other.animRunning_)
-    , selectionCursor_(other.selectionCursor_)
-    , selectionCursorColor_(other.selectionCursorColor_)
-    , selectionCursorOpa_(other.selectionCursorOpa_)
-    , selectionCursorRadius_(other.selectionCursorRadius_)
-    , selectionCursorVisible_(other.selectionCursorVisible_)
-    , selectionCursorX_(other.selectionCursorX_)
-    , selectionCursorY_(other.selectionCursorY_)
-    , selectionCursorWidth_(other.selectionCursorWidth_)
-    , selectionCursorHeight_(other.selectionCursorHeight_) {
-    other.container_ = nullptr;
-    other.selectionCursor_ = nullptr;
-    other.parent_ = nullptr;
-    other.animRunning_ = false;
-}
-
-VirtualList& VirtualList::operator=(VirtualList&& other) noexcept {
-    if (this != &other) {
-        // Clean up current resources
-        if (animRunning_) {
-            lv_anim_delete(this, scrollAnimCallback);
-        }
-        for (auto& slot : slots_) {
-            slot.userData = nullptr;
-        }
-        if (container_) {
-            lv_obj_delete(container_);
-        }
-
-        // Move from other
-        parent_ = other.parent_;
-        container_ = other.container_;
-        slots_ = std::move(other.slots_);
-        visibleCount_ = other.visibleCount_;
-        itemHeight_ = other.itemHeight_;
-        autoSizing_ = other.autoSizing_;
-        totalCount_ = other.totalCount_;
-        selectedIndex_ = other.selectedIndex_;
-        previousSelectedIndex_ = other.previousSelectedIndex_;
-        windowStart_ = other.windowStart_;
-        onBindSlot_ = std::move(other.onBindSlot_);
-        onUpdateHighlight_ = std::move(other.onUpdateHighlight_);
-        scrollMode_ = other.scrollMode_;
-        animateScroll_ = other.animateScroll_;
-        visible_ = other.visible_;
-        initialized_ = other.initialized_;
-        padding_ = other.padding_;
-        itemGap_ = other.itemGap_;
-        marginH_ = other.marginH_;
-        animRunning_ = other.animRunning_;
-        selectionCursor_ = other.selectionCursor_;
-        selectionCursorColor_ = other.selectionCursorColor_;
-        selectionCursorOpa_ = other.selectionCursorOpa_;
-        selectionCursorRadius_ = other.selectionCursorRadius_;
-        selectionCursorVisible_ = other.selectionCursorVisible_;
-        selectionCursorX_ = other.selectionCursorX_;
-        selectionCursorY_ = other.selectionCursorY_;
-        selectionCursorWidth_ = other.selectionCursorWidth_;
-        selectionCursorHeight_ = other.selectionCursorHeight_;
-
-        other.container_ = nullptr;
-        other.selectionCursor_ = nullptr;
-        other.parent_ = nullptr;
-        other.animRunning_ = false;
-    }
-    return *this;
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // Fluent Configuration
 // ══════════════════════════════════════════════════════════════════════════════
 
 VirtualList& VirtualList::visibleCount(int count) {
+    if (initialized_) return *this;
+
     if (count > 0 && count != visibleCount_) {
         visibleCount_ = count;
-        if (initialized_) {
-            // Recreate slots with new count
-            for (auto& slot : slots_) {
-                if (slot.container) {
-                    lv_obj_delete(slot.container);
-                }
-                slot.userData = nullptr;
-            }
-            slots_.clear();
-            createSlots();
-            if (autoSizing_) {
-                recalculateItemHeight();
-            }
-            windowStart_ = -1;
-            rebindAllSlots();
-        }
     }
     return *this;
 }
@@ -190,11 +78,6 @@ VirtualList& VirtualList::scrollMode(ScrollMode mode) {
             rebindAllSlots();
         }
     }
-    return *this;
-}
-
-VirtualList& VirtualList::animateScroll(bool enabled) {
-    animateScroll_ = enabled;
     return *this;
 }
 
@@ -260,6 +143,7 @@ VirtualList& VirtualList::onUpdateHighlight(UpdateHighlightCallback callback) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 bool VirtualList::setTotalCount(int count) {
+    count = std::max(0, count);
     bool changed = (totalCount_ != count);
     totalCount_ = count;
 
@@ -269,7 +153,6 @@ bool VirtualList::setTotalCount(int count) {
 
     if (changed) {
         windowStart_ = -1;  // Force recalculation
-        previousSelectedIndex_ = -1;
         rebindAllSlots();
     } else if (totalCount_ == 0) {
         hideSelectionCursor();
@@ -305,7 +188,7 @@ void VirtualList::invalidate() {
 
 void VirtualList::invalidateIndex(int logicalIndex) {
     int slotIdx = logicalIndexToSlotIndex(logicalIndex);
-    if (slotIdx >= 0 && onBindSlot_) {
+    if (slotIdx >= 0 && slotIdx < static_cast<int>(slots_.size()) && onBindSlot_) {
         VirtualSlot& slot = slots_[slotIdx];
         bool isSelected = (logicalIndex == selectedIndex_);
         onBindSlot_(slot, logicalIndex, isSelected);
@@ -314,26 +197,27 @@ void VirtualList::invalidateIndex(int logicalIndex) {
 
 VirtualSlot* VirtualList::getSlotForIndex(int logicalIndex) {
     int slotIdx = logicalIndexToSlotIndex(logicalIndex);
-    return (slotIdx >= 0) ? &slots_[slotIdx] : nullptr;
+    if (slotIdx < 0 || slotIdx >= static_cast<int>(slots_.size())) return nullptr;
+    return slots_[slotIdx].boundIndex == logicalIndex ? &slots_[slotIdx] : nullptr;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // IComponent
 // ══════════════════════════════════════════════════════════════════════════════
 
+void VirtualList::prepare() {
+    if (!container_ || initialized_) return;
+
+    createSlots();
+    initialized_ = true;
+}
+
 void VirtualList::show() {
     if (container_) {
         lv_obj_clear_flag(container_, LV_OBJ_FLAG_HIDDEN);
         visible_ = true;
-
-        // Create slots on first show if not yet done
-        if (!initialized_) {
-            if (autoSizing_) {
-                recalculateItemHeight();
-            }
-            createSlots();
-            initialized_ = true;
-        }
+        if (autoSizing_) recalculateItemHeight();
+        prepare();
 
         rebindAllSlots();
         updateSelectionCursor();
@@ -352,8 +236,8 @@ void VirtualList::hide() {
 // Private: Container & Slots Creation
 // ══════════════════════════════════════════════════════════════════════════════
 
-FLASHMEM void VirtualList::createContainer() {
-    container_ = lv_obj_create(parent_);
+FLASHMEM void VirtualList::createContainer(lv_obj_t* parent) {
+    container_ = lv_obj_create(parent);
     lv_obj_set_size(container_, LV_PCT(100), LV_PCT(100));
     lv_obj_set_flex_grow(container_, 1);
 
@@ -373,6 +257,7 @@ FLASHMEM void VirtualList::createContainer() {
 
     // Listen for size changes for auto-sizing
     lv_obj_add_event_cb(container_, sizeChangedCallback, LV_EVENT_SIZE_CHANGED, this);
+    lv_obj_add_event_cb(container_, layoutChangedCallback, LV_EVENT_LAYOUT_CHANGED, this);
 }
 
 FLASHMEM void VirtualList::createSlots() {
@@ -411,7 +296,6 @@ FLASHMEM void VirtualList::createSlots() {
         lv_obj_add_flag(slot.container, LV_OBJ_FLAG_HIDDEN);
 
         slot.boundIndex = -1;
-        slot.userData = nullptr;
 
         slots_.push_back(slot);
     }
@@ -480,6 +364,10 @@ int VirtualList::logicalIndexToSlotIndex(int logicalIndex) const {
 
 void VirtualList::rebindAllSlots() {
     if (!onBindSlot_ || totalCount_ == 0) {
+        for (auto& slot : slots_) {
+            slot.boundIndex = -1;
+            if (slot.container) lv_obj_add_flag(slot.container, LV_OBJ_FLAG_HIDDEN);
+        }
         hideSelectionCursor();
         return;
     }
@@ -502,7 +390,6 @@ void VirtualList::rebindAllSlots() {
         }
     }
 
-    previousSelectedIndex_ = selectedIndex_;
     updateSelectionCursor();
 }
 
@@ -510,12 +397,7 @@ void VirtualList::updateSelection(int oldIndex, int newIndex) {
     int newWindowStart = calculateWindowStart();
 
     if (newWindowStart != windowStart_) {
-        // Window changed
-        if (animateScroll_) {
-            animateToWindowStart(newWindowStart);
-        } else {
-            rebindAllSlots();
-        }
+        rebindAllSlots();
     } else {
         // Same window: just update highlights
         updateHighlightOnly(oldIndex, newIndex);
@@ -540,23 +422,6 @@ void VirtualList::updateHighlightOnly(int oldIndex, int newIndex) {
         onBindSlot_(slots_[newSlotIdx], newIndex, true);
     }
 
-    previousSelectedIndex_ = newIndex;
-}
-
-void VirtualList::rebindSlot(VirtualSlot& slot, int newIndex) {
-    slot.boundIndex = newIndex;
-    bool isSelected = (newIndex == selectedIndex_);
-    if (onBindSlot_) {
-        onBindSlot_(slot, newIndex, isSelected);
-    }
-}
-
-void VirtualList::updateSlotHighlight(VirtualSlot& slot, bool isSelected) {
-    if (onUpdateHighlight_) {
-        onUpdateHighlight_(slot, isSelected);
-    } else if (onBindSlot_ && slot.boundIndex >= 0) {
-        onBindSlot_(slot, slot.boundIndex, isSelected);
-    }
 }
 
 void VirtualList::createSelectionCursor() {
@@ -599,14 +464,10 @@ void VirtualList::moveSelectionCursorToSlot(VirtualSlot& slot) {
     lv_coord_t nextY = lv_obj_get_y(slot.container);
     lv_coord_t nextW = lv_obj_get_width(slot.container);
     lv_coord_t nextH = lv_obj_get_height(slot.container);
-    if ((nextW <= 0 || nextH <= 0) && container_) {
-        lv_obj_update_layout(container_);
-        nextX = lv_obj_get_x(slot.container);
-        nextY = lv_obj_get_y(slot.container);
-        nextW = lv_obj_get_width(slot.container);
-        nextH = lv_obj_get_height(slot.container);
-    }
     if (nextW <= 0 || nextH <= 0) {
+        // A newly revealed retained surface may not have geometry until LVGL's
+        // next refresh. Keep the cursor hidden rather than forcing a synchronous
+        // layout of the entire screen from the caller's render path.
         hideSelectionCursor();
         return;
     }
@@ -634,30 +495,19 @@ void VirtualList::hideSelectionCursor() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Private: Animation
-// ══════════════════════════════════════════════════════════════════════════════
-
-void VirtualList::animateToWindowStart(int targetStart) {
-    // For now, just rebind without animation
-    // TODO: Implement smooth scroll animation
-    rebindAllSlots();
-}
-
-void VirtualList::scrollAnimCallback(void* var, int32_t value) {
-    // TODO: Implement animation callback
-    (void)var;
-    (void)value;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 // Private: Event Handlers
 // ══════════════════════════════════════════════════════════════════════════════
 
 void VirtualList::sizeChangedCallback(lv_event_t* e) {
     auto* self = static_cast<VirtualList*>(lv_event_get_user_data(e));
-    if (self && self->autoSizing_) {
-        self->recalculateItemHeight();
-    }
+    if (!self) return;
+    if (self->autoSizing_) self->recalculateItemHeight();
+    self->updateSelectionCursor();
+}
+
+void VirtualList::layoutChangedCallback(lv_event_t* e) {
+    auto* self = static_cast<VirtualList*>(lv_event_get_user_data(e));
+    if (self) self->updateSelectionCursor();
 }
 
 }  // namespace oc::ui::lvgl::widget
