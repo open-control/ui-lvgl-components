@@ -20,6 +20,16 @@
       "-D LV_CONF_INCLUDE_SIMPLE",
       "-D LV_LVGL_H_INCLUDE_SIMPLE"
     ],
-    "srcFilter": ["+<**/*.cpp>", "-<main.cpp>"]
+    "srcFilter": [
+      "+<component/ParameterEnum.cpp>",
+      "+<component/ParameterKnob.cpp>",
+      "+<component/ParameterSwitch.cpp>",
+      "+<widget/ButtonWidget.cpp>",
+      "+<widget/EnumWidget.cpp>",
+      "+<widget/KnobWidget.cpp>",
+      "+<widget/Label.cpp>",
+      "+<widget/StateIndicator.cpp>",
+      "+<widget/VirtualList.cpp>"
+    ]
   }
 }
