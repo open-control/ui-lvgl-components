@@ -667,7 +667,8 @@ bool KnobWidget::updateArc() {
     }
 
     if (render_profile_ != KnobRenderProfile::ArcOnly) {
-        const float angle_rad = static_cast<float>(value_angle) * static_cast<float>(M_PI) / 180.0f;
+        constexpr float RADIANS_PER_DEGREE = 0.01745329252f;
+        const float angle_rad = static_cast<float>(value_angle) * RADIANS_PER_DEGREE;
         updated = updateIndicatorLine(angle_rad) || updated;
     }
     return updated;

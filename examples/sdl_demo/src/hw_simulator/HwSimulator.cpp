@@ -60,6 +60,7 @@ void HwEncoder::render(SDL_Renderer* renderer) const {
 
     // Value arc (from 7 o'clock to current value) - thicker with AA
     if (!isRelative) {
+        constexpr float RADIANS_PER_DEGREE = 0.01745329252f;
         int startAngle = 135;
         int endAngle = 135 + static_cast<int>(value * 270);
 
@@ -70,8 +71,8 @@ void HwEncoder::render(SDL_Renderer* renderer) const {
             if (currentRadius < radius / 2) break;
 
             for (int angle = startAngle; angle < endAngle && angle < startAngle + 270; angle++) {
-                float rad = angle * M_PI / 180.0f;
-                float radNext = (angle + 1) * M_PI / 180.0f;
+                float rad = angle * RADIANS_PER_DEGREE;
+                float radNext = (angle + 1) * RADIANS_PER_DEGREE;
                 int x1 = x + static_cast<int>(currentRadius * cosf(rad));
                 int y1 = y + static_cast<int>(currentRadius * sinf(rad));
                 int x2 = x + static_cast<int>(currentRadius * cosf(radNext));
