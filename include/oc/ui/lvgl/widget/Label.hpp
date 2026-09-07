@@ -15,7 +15,7 @@ namespace oc::ui::lvgl {
  *
  * Features:
  * - Optional auto-scroll animation when text exceeds container width
- * - Configurable scroll timing and delays
+ * - Native forward/pause/return scroll animation
  * - Flex-grow support for layout integration
  * - Grid layout support via gridCell() helper
  * - Full LVGL compatibility
@@ -182,30 +182,23 @@ public:
 
 private:
     void createWidgets(lv_obj_t* parent);
+    void bindEvents(Label* previousOwner = nullptr);
     void cleanup();
 
     void checkOverflowAndScroll();
-    void applyStaticAlignment();
     void startScrollAnimation();
     void stopScrollAnimation();
 
     static void scrollAnimCallback(void* var, int32_t value);
-    static void pauseTimerCallback(lv_timer_t* timer);
-    static void sizeChangedCallback(lv_event_t* e);
+    static void geometryCallback(lv_event_t* event);
 
     lv_obj_t* container_ = nullptr;
     lv_obj_t* label_ = nullptr;
-    lv_anim_t scroll_anim_;
-    lv_timer_t* pending_timer_ = nullptr;
 
     bool auto_scroll_enabled_ = true;
-    bool anim_running_ = false;
     bool owns_lvgl_objects_ = true;
     lv_coord_t overflow_amount_ = 0;
     lv_text_align_t alignment_ = LV_TEXT_ALIGN_CENTER;
-
-    uint32_t scroll_duration_ms_ = 2000;
-    uint32_t pause_duration_ms_ = 1000;
 };
 
 }  // namespace oc::ui::lvgl
